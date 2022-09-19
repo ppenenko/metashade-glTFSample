@@ -16,6 +16,7 @@ import argparse, os, pathlib
 from pygltflib import GLTF2
 
 from metashade.hlsl.sm5 import vs_5_0, ps_5_0
+import metashade.hlsl.common as hlsl_common
 
 def _generate_vs_out(sh, primitive):
     with sh.vs_output('VsOut') as VsOut:
@@ -52,6 +53,8 @@ def _generate_per_frame_uniform_buffer(sh):
         sh.uniform('PADDING', sh.Float)
         sh.uniform('gNumLights', sh.Float)   # should be int
         sh.uniform('gLight', sh.Light)      # should be an array
+
+_vs_main = 'vsMain'
 
 def _generate_vs(vs_file, primitive):
     sh = vs_5_0.Generator(vs_file)
@@ -91,7 +94,7 @@ def _generate_vs(vs_file, primitive):
 
     _generate_vs_out(sh, primitive)
 
-    with sh.main('mainVS', sh.VsOut)(vsIn = sh.VsIn):
+    with sh.main(_vs_main, sh.VsOut)(vsIn = sh.VsIn):
         sh.Pw = sh.gWorldXf.xform(sh.vsIn.Pobj)
 
         sh.vsOut = sh.VsOut()
@@ -107,6 +110,8 @@ def _generate_vs(vs_file, primitive):
         sh.vsOut.UV0 = sh.vsIn.UV0
 
         sh.return_(sh.vsOut)
+
+_ps_main = 'psMain'
 
 def _generate_ps(ps_file, material, primitive):
     sh = ps_5_0.Generator(ps_file)
@@ -150,7 +155,7 @@ def _generate_ps(ps_file, material, primitive):
         )
         texture_idx += 1
 
-    with sh.main('mainPS', sh.PsOut)(psIn = sh.VsOut):
+    with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
         def _sample_texture(texture_name : str):
             texture_name += 'Texture'
             gltf_texture = getattr(material, texture_name)
@@ -192,10 +197,10 @@ def _generate_ps(ps_file, material, primitive):
 
         sh.return_(sh.psOut)
 
-def main(gltf_dir, out_dir):
+def main(gltf_dir : str, out_dir : str, compile : bool):
     os.makedirs(out_dir, exist_ok = True)
 
-    for gltf_file_path in pathlib.Path(args.gltf_dir).glob('**/*.gltf'):
+    for gltf_file_path in pathlib.Path(gltf_dir).glob('**/*.gltf'):
         print(gltf_file_path)
         gltf_asset = GLTF2().load(gltf_file_path)
 
@@ -206,14 +211,29 @@ def main(gltf_dir, out_dir):
                         out_dir,
                         f'{mesh.name}-{primitive_idx}-{stage}.hlsl'
                     )
-                with open(_file_name("VS"), 'w') as vs_file:
-                    _generate_vs(vs_file, primitive)
 
-                with open(_file_name("PS"), 'w') as ps_file:
+                file_name = _file_name('VS')
+                with open(file_name, 'w') as vs_file:
+                    _generate_vs(vs_file, primitive)
+                if compile:
+                    assert 0 == hlsl_common.compile(
+                        path = file_name,
+                        entry_point_name = _vs_main,
+                        profile = 'vs_6_0'
+                    )
+
+                file_name = _file_name('PS')
+                with open(file_name, 'w') as ps_file:
                     _generate_ps(
                         ps_file,
                         gltf_asset.materials[primitive.material],
                         primitive
+                    )
+                if compile:
+                    assert 0 == hlsl_common.compile(
+                        path = file_name,
+                        entry_point_name = _ps_main,
+                        profile = 'ps_6_0'
                     )
 
 if __name__ == "__main__":
@@ -222,9 +242,14 @@ if __name__ == "__main__":
     )
     parser.add_argument("--gltf-dir", help = "Path to the source glTF assets")
     parser.add_argument("--out-dir", help = "Path to the output directory")
+    parser.add_argument(
+        "--compile",
+        action = 'store_true',
+        help = "Compile the generated shaders with DXC (has to be in PATH)"
+    )
     args = parser.parse_args()
     
     if not os.path.isdir(args.gltf_dir):
         raise NotADirectoryError(args.gltf_dir)
 
-    main(args.gltf_dir, args.out_dir)
+    main(args.gltf_dir, args.out_dir, args.compile)
