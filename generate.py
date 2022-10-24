@@ -15,7 +15,7 @@
 import argparse, os, pathlib
 from pygltflib import GLTF2
 
-from metashade.hlsl.sm5 import vs_5_0, ps_5_0
+from metashade.hlsl.sm6 import ps_6_0, vs_6_0
 import metashade.hlsl.common as hlsl_common
 
 def _generate_vs_out(sh, primitive):
@@ -54,10 +54,10 @@ def _generate_per_frame_uniform_buffer(sh):
         sh.uniform('gNumLights', sh.Float)   # should be int
         sh.uniform('gLight', sh.Light)      # should be an array
 
-_vs_main = 'vsMain'
+_vs_main = 'mainVS'
 
 def _generate_vs(vs_file, primitive):
-    sh = vs_5_0.Generator(vs_file)
+    sh = vs_6_0.Generator(vs_file)
 
     _generate_per_frame_uniform_buffer(sh)
 
@@ -111,10 +111,10 @@ def _generate_vs(vs_file, primitive):
 
         sh.return_(sh.vsOut)
 
-_ps_main = 'psMain'
+_ps_main = 'mainPS'
 
 def _generate_ps(ps_file, material, primitive):
-    sh = ps_5_0.Generator(ps_file)
+    sh = ps_6_0.Generator(ps_file)
 
     _generate_per_frame_uniform_buffer(sh)
 
