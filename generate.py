@@ -140,12 +140,8 @@ def _generate_ps(ps_file, material, primitive):
         )
         _add_texture(material.pbrMetallicRoughness, 'metallicRoughness')
 
-    # First 3 sampler slots are reserved for the BRDF LUT and IBL textures
-    # in the GLTF demo app (assuming the skydome is on)
-    texture_idx = 3
-
     # We're sorting material textures by name
-    for texture_name in sorted(texture_dict):
+    for texture_idx, texture_name in enumerate(sorted(texture_dict)):
         sh.combined_sampler_2d(
             texture_name = texture_name,
             texture_register = texture_idx,
@@ -153,7 +149,6 @@ def _generate_ps(ps_file, material, primitive):
             sampler_register = texture_idx,
             texel_type = texture_dict[texture_name]
         )
-        texture_idx += 1
 
     with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
         def _sample_texture(texture_name : str):
