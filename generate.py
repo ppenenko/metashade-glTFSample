@@ -32,6 +32,7 @@ def _generate_vs_out(sh, primitive):
 def _generate_per_frame_uniform_buffer(sh):
     sh.struct('Light')(
         VpXf = sh.Matrix4x4f,
+        ViewXf = sh.Matrix4x4f,
         direction = sh.Vector3f,
         range = sh.Float,
         color = sh.RgbF,
@@ -46,13 +47,22 @@ def _generate_per_frame_uniform_buffer(sh):
 
     with sh.uniform_buffer(register = 0, name = 'cbPerFrame'):
         sh.uniform('gVpXf', sh.Matrix4x4f)
+        sh.uniform('gPrevVpXf', sh.Matrix4x4f)
         sh.uniform('gVpIXf', sh.Matrix4x4f)
         sh.uniform('gCameraPos', sh.Vector4f)
         sh.uniform('gIblFactor', sh.Float)
         sh.uniform('gEmissiveFactor', sh.RgbaF)
-        sh.uniform('PADDING', sh.Float)
+        sh.uniform('gInvScreenResolution', sh.Float2)
+        sh.uniform('gWireframeOptions', sh.Float4)
+        sh.uniform('gMCameraCurrJitter', sh.Float2)
+        sh.uniform('gMCameraPrevJitter', sh.Float2)
+
+        # should be an array
+        for light_idx in range(0, 80):
+            sh.uniform(f'gLight{light_idx}', sh.Light)
+
         sh.uniform('gNumLights', sh.Float)   # should be int
-        sh.uniform('gLight', sh.Light)      # should be an array
+        sh.uniform('gLodBias', sh.Light)
 
 _vs_main = 'mainVS'
 
@@ -174,7 +184,7 @@ def _generate_ps(ps_file, material, primitive):
             sh.Nw = sh.psIn.Nw
         sh.Nw = sh.Nw.normalize()
 
-        sh.lambert = sh.gLight.direction.dot(sh.Nw).saturate()
+        sh.lambert = sh.gLight0.direction.dot(sh.Nw).saturate()
         sh.baseColor = sh.baseColorTextureSampler(sh.psIn.UV0)
         
         sh.psOut = sh.PsOut()
