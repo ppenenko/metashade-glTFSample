@@ -46,23 +46,41 @@ def _generate_per_frame_uniform_buffer(sh):
     )
 
     with sh.uniform_buffer(register = 0, name = 'cbPerFrame'):
-        sh.uniform('gVpXf', sh.Matrix4x4f)
-        sh.uniform('gPrevVpXf', sh.Matrix4x4f)
-        sh.uniform('gVpIXf', sh.Matrix4x4f)
-        sh.uniform('gCameraPos', sh.Vector4f)
-        sh.uniform('gIblFactor', sh.Float)
-        sh.uniform('gEmissiveFactor', sh.RgbaF)
-        sh.uniform('gInvScreenResolution', sh.Float2)
-        sh.uniform('gWireframeOptions', sh.Float4)
-        sh.uniform('gMCameraCurrJitter', sh.Float2)
-        sh.uniform('gMCameraPrevJitter', sh.Float2)
+        sh.uniform('g_VpXf', sh.Matrix4x4f)
+        sh.uniform('g_prevVpXf', sh.Matrix4x4f)
+        sh.uniform('g_VpIXf', sh.Matrix4x4f)
+        sh.uniform('g_cameraPos', sh.Vector4f)
+        sh.uniform('g_iblFactor', sh.Float)
+        sh.uniform('g_perFrameEmissiveFactor', sh.Float)
+        sh.uniform('g_invScreenResolution', sh.Float2)
+        sh.uniform('g_wireframeOptions', sh.Float4)
+        sh.uniform('g_mCameraCurrJitter', sh.Float2)
+        sh.uniform('g_mCameraPrevJitter', sh.Float2)
 
         # should be an array
         for light_idx in range(0, 80):
-            sh.uniform(f'gLight{light_idx}', sh.Light)
+            sh.uniform(f'g_light{light_idx}', sh.Light)
 
-        sh.uniform('gNumLights', sh.Float)   # should be int
-        sh.uniform('gLodBias', sh.Light)
+        sh.uniform('g_nLights', sh.Float)   # should be int
+        sh.uniform('g_lodBias', sh.Light)
+
+def _generate_per_object_uniform_buffer(sh):
+    with sh.uniform_buffer(register = 1, name = 'cbPerObject'):
+        sh.uniform('g_WorldXf', sh.Matrix4x4f) # should be 3x3
+        sh.uniform('g_prevWorldXf', sh.Matrix4x4f) # should be 3x3
+        sh.uniform('g_perObjectEmissiveFactor', sh.RgbaF)
+
+        # pbrMetallicRoughness
+        sh.uniform('g_baseColorFactor', sh.RgbaF)
+        sh.uniform('g_metallicFactor', sh.RgbaF)
+        sh.uniform('g_roughnessFactor', sh.RgbaF)
+
+        sh.uniform('g_perFramePadding', sh.Float2)
+
+        # KHR_materials_pbrSpecularGlossiness
+        sh.uniform('g_diffuseFactor', sh.RgbaF)
+        sh.uniform('g_specularFactor', sh.RgbF)
+        sh.uniform('g_glossinessFactor', sh.Float)
 
 _vs_main = 'mainVS'
 
@@ -70,9 +88,7 @@ def _generate_vs(vs_file, primitive):
     sh = vs_6_0.Generator(vs_file)
 
     _generate_per_frame_uniform_buffer(sh)
-
-    with sh.uniform_buffer(register = 1, name = 'cbPerObject'):
-        sh.uniform('gWorldXf', sh.Matrix4x4f) # should be 3x3
+    _generate_per_object_uniform_buffer(sh)
 
     attributes = primitive.attributes
 
@@ -105,14 +121,14 @@ def _generate_vs(vs_file, primitive):
     _generate_vs_out(sh, primitive)
 
     with sh.main(_vs_main, sh.VsOut)(vsIn = sh.VsIn):
-        sh.Pw = sh.gWorldXf.xform(sh.vsIn.Pobj)
+        sh.Pw = sh.g_WorldXf.xform(sh.vsIn.Pobj)
 
         sh.vsOut = sh.VsOut()
-        sh.vsOut.Pclip = sh.gVpXf.xform(sh.Pw)
-        sh.vsOut.Nw = sh.gWorldXf.xform(sh.vsIn.Nobj).xyz.normalize()
+        sh.vsOut.Pclip = sh.g_VpXf.xform(sh.Pw)
+        sh.vsOut.Nw = sh.g_WorldXf.xform(sh.vsIn.Nobj).xyz.normalize()
         
         if attributes.TANGENT is not None:
-            sh.vsOut.Tw = sh.gWorldXf.xform(
+            sh.vsOut.Tw = sh.g_WorldXf.xform(
                 sh.vsIn.Tobj.xyz.as_vector4()
             ).xyz.normalize()
             sh.vsOut.Bw = sh.vsOut.Nw.cross(sh.vsOut.Tw) * sh.vsIn.Tobj.w
@@ -127,6 +143,7 @@ def _generate_ps(ps_file, material, primitive):
     sh = ps_6_0.Generator(ps_file)
 
     _generate_per_frame_uniform_buffer(sh)
+    _generate_per_object_uniform_buffer(sh)
 
     _generate_vs_out(sh, primitive)
 
@@ -184,7 +201,7 @@ def _generate_ps(ps_file, material, primitive):
             sh.Nw = sh.psIn.Nw
         sh.Nw = sh.Nw.normalize()
 
-        sh.lambert = sh.gLight0.direction.dot(sh.Nw).saturate()
+        sh.lambert = sh.g_light0.direction.dot(sh.Nw).saturate()
         sh.baseColor = sh.baseColorTextureSampler(sh.psIn.UV0)
         
         sh.psOut = sh.PsOut()
@@ -195,10 +212,11 @@ def _generate_ps(ps_file, material, primitive):
         if aoSample is not None:
             sh.psOut.color.rgb = sh.psOut.color.rgb * aoSample.x
 
+        sh.emissive = sh.g_perObjectEmissiveFactor.rgb * sh.g_perFrameEmissiveFactor
         emissiveSample = _sample_texture('emissive')
         if emissiveSample is not None:
-            sh.psOut.color.rgb = sh.psOut.color.rgb + emissiveSample.rgb \
-                * sh.gEmissiveFactor.rgb * sh.gEmissiveFactor.a
+            sh.emissive = sh.emissive * emissiveSample.rgb
+        sh.psOut.color.rgb = sh.psOut.color.rgb + sh.emissive
 
         sh.return_(sh.psOut)
 
