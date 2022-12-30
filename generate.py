@@ -62,7 +62,7 @@ def _generate_per_frame_uniform_buffer(sh):
             sh.uniform(f'g_light{light_idx}', sh.Light)
 
         sh.uniform('g_nLights', sh.Float)   # should be int
-        sh.uniform('g_lodBias', sh.Light)
+        sh.uniform('g_lodBias', sh.Float)
 
 def _generate_per_object_uniform_buffer(sh):
     with sh.uniform_buffer(register = 1, name = 'cbPerObject'):
