@@ -227,12 +227,16 @@ def main(gltf_dir : str, out_dir : str, compile : bool):
         print(gltf_file_path)
         gltf_asset = GLTF2().load(gltf_file_path)
 
-        for mesh in gltf_asset.meshes:
+        for mesh_idx, mesh in enumerate(gltf_asset.meshes):
+            mesh_name = ( mesh.name if mesh.name is not None
+                else f'UnnamedMesh{mesh_idx}'
+            )
+
             for primitive_idx, primitive in enumerate(mesh.primitives):
                 def _file_name(stage : str):
                     return os.path.join(
                         out_dir,
-                        f'{mesh.name}-{primitive_idx}-{stage}.hlsl'
+                        f'{mesh_name}-{primitive_idx}-{stage}.hlsl'
                     )
 
                 file_name = _file_name('VS')
