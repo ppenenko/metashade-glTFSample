@@ -166,6 +166,11 @@ def _generate_ps(ps_file, material, primitive):
             material.pbrMetallicRoughness, 'baseColor', sh.RgbaF
         )
         _add_texture(material.pbrMetallicRoughness, 'metallicRoughness')
+    elif material.extensions is not None:
+        specularGlossiness = material.extensions.KHR_materials_pbrSpecularGlossiness
+        if specularGlossiness is not None:
+            _add_texture(specularGlossiness, 'diffuse', sh.RgbaF)
+            _add_texture(specularGlossiness, 'specularGlossiness')
 
     # We're sorting material textures by name
     for texture_idx, texture_name in enumerate(sorted(texture_dict)):
