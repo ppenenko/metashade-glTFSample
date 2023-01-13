@@ -17,6 +17,7 @@ from pygltflib import GLTF2
 
 from metashade.hlsl.sm6 import ps_6_0, vs_6_0
 import metashade.hlsl.common as hlsl_common
+import metashade.util as util
 
 def _generate_vs_out(sh, primitive):
     with sh.vs_output('VsOut') as VsOut:
@@ -235,8 +236,8 @@ def main(gltf_dir : str, out_dir : str, compile : bool):
     os.makedirs(out_dir, exist_ok = True)
 
     for gltf_file_path in pathlib.Path(gltf_dir).glob('**/*.gltf'):
-        print(gltf_file_path)
-        gltf_asset = GLTF2().load(gltf_file_path)
+        with util.TimedScope(f'Loading glTF asset {gltf_file_path} '):
+            gltf_asset = GLTF2().load(gltf_file_path)
 
         for mesh_idx, mesh in enumerate(gltf_asset.meshes):
             mesh_name = ( mesh.name if mesh.name is not None
@@ -251,28 +252,32 @@ def main(gltf_dir : str, out_dir : str, compile : bool):
                     )
 
                 file_name = _file_name('VS')
-                with open(file_name, 'w') as vs_file:
+                with util.TimedScope(f'Generating {file_name} ', 'Done'), \
+                    open(file_name, 'w') as vs_file:
                     _generate_vs(vs_file, primitive)
                 if compile:
-                    assert 0 == hlsl_common.compile(
-                        path = file_name,
-                        entry_point_name = _vs_main,
-                        profile = 'vs_6_0'
-                    )
+                    with util.TimedScope(f'Compiling'):
+                        assert 0 == hlsl_common.compile(
+                            path = file_name,
+                            entry_point_name = _vs_main,
+                            profile = 'vs_6_0'
+                        )
 
                 file_name = _file_name('PS')
-                with open(file_name, 'w') as ps_file:
+                with util.TimedScope(f'Generating {file_name} ', 'Done'), \
+                    open(file_name, 'w') as ps_file:
                     _generate_ps(
                         ps_file,
                         gltf_asset.materials[primitive.material],
                         primitive
                     )
                 if compile:
-                    assert 0 == hlsl_common.compile(
-                        path = file_name,
-                        entry_point_name = _ps_main,
-                        profile = 'ps_6_0'
-                    )
+                    with util.TimedScope(f'Compiling'):
+                        assert 0 == hlsl_common.compile(
+                            path = file_name,
+                            entry_point_name = _ps_main,
+                            profile = 'ps_6_0'
+                        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
