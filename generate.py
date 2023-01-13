@@ -208,6 +208,7 @@ def _generate_ps(ps_file, material, primitive):
             sh.tbn = sh.tbn.transpose()
             sh.Nw = sh.tbn.xform(2.0 * normalSample.xyz - sh.Float3(1.0))
         else:
+            print ('TODO: https://github.com/ppenenko/metashade/issues/19')
             sh.Nw = sh.psIn.Nw
         sh.Nw = sh.Nw.normalize()
 
