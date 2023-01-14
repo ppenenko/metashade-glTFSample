@@ -256,12 +256,11 @@ def main(gltf_dir : str, out_dir : str, compile : bool):
                     open(file_name, 'w') as vs_file:
                     _generate_vs(vs_file, primitive)
                 if compile:
-                    with util.TimedScope(f'Compiling'):
-                        assert 0 == hlsl_common.compile(
-                            path = file_name,
-                            entry_point_name = _vs_main,
-                            profile = 'vs_6_0'
-                        )
+                    assert 0 == hlsl_common.compile(
+                        path = file_name,
+                        entry_point_name = _vs_main,
+                        profile = 'vs_6_0'
+                    )
 
                 file_name = _file_name('PS')
                 with util.TimedScope(f'Generating {file_name} ', 'Done'), \
@@ -272,12 +271,11 @@ def main(gltf_dir : str, out_dir : str, compile : bool):
                         primitive
                     )
                 if compile:
-                    with util.TimedScope(f'Compiling'):
-                        assert 0 == hlsl_common.compile(
-                            path = file_name,
-                            entry_point_name = _ps_main,
-                            profile = 'ps_6_0'
-                        )
+                    assert 0 == hlsl_common.compile(
+                        path = file_name,
+                        entry_point_name = _ps_main,
+                        profile = 'ps_6_0'
+                    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
