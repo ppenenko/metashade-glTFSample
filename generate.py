@@ -65,23 +65,30 @@ def _generate_per_frame_uniform_buffer(sh):
         sh.uniform('g_nLights', sh.Float)   # should be int
         sh.uniform('g_lodBias', sh.Float)
 
-def _generate_per_object_uniform_buffer(sh):
+def _generate_per_object_uniform_buffer(sh, is_ps : bool):
+    if is_ps:
+        # https://github.com/ppenenko/Cauldron/blob/master/src/DX12/shaders/PBRPixelParams.hlsl#L33
+        sh.struct('PbrFactors')(
+            emissive = sh.RgbaF,
+
+            # pbrMetallicRoughness
+            baseColor = sh.RgbaF,
+            metallic = sh.Float,
+            roughness = sh.Float,
+
+            padding = sh.Float2,
+
+            #  KHR_materials_pbrSpecularGlossiness
+            diffuse = sh.RgbaF,
+            specular = sh.RgbF,
+            glossiness = sh.Float # float glossinessFactor;
+        )
+
     with sh.uniform_buffer(register = 1, name = 'cbPerObject'):
         sh.uniform('g_WorldXf', sh.Matrix4x4f) # should be 3x3
         sh.uniform('g_prevWorldXf', sh.Matrix4x4f) # should be 3x3
-        sh.uniform('g_perObjectEmissiveFactor', sh.RgbaF)
-
-        # pbrMetallicRoughness
-        sh.uniform('g_baseColorFactor', sh.RgbaF)
-        sh.uniform('g_metallicFactor', sh.RgbaF)
-        sh.uniform('g_roughnessFactor', sh.RgbaF)
-
-        sh.uniform('g_perFramePadding', sh.Float2)
-
-        # KHR_materials_pbrSpecularGlossiness
-        sh.uniform('g_diffuseFactor', sh.RgbaF)
-        sh.uniform('g_specularFactor', sh.RgbF)
-        sh.uniform('g_glossinessFactor', sh.Float)
+        if is_ps:
+            sh.uniform('g_perObjectPbrFactors', sh.PbrFactors)
 
 _vs_main = 'mainVS'
 
@@ -89,7 +96,7 @@ def _generate_vs(vs_file, primitive):
     sh = vs_6_0.Generator(vs_file)
 
     _generate_per_frame_uniform_buffer(sh)
-    _generate_per_object_uniform_buffer(sh)
+    _generate_per_object_uniform_buffer(sh, is_ps = False)
 
     attributes = primitive.attributes
 
@@ -144,7 +151,7 @@ def _generate_ps(ps_file, material, primitive):
     sh = ps_6_0.Generator(ps_file)
 
     _generate_per_frame_uniform_buffer(sh)
-    _generate_per_object_uniform_buffer(sh)
+    _generate_per_object_uniform_buffer(sh, is_ps = True)
 
     _generate_vs_out(sh, primitive)
 
@@ -224,7 +231,7 @@ def _generate_ps(ps_file, material, primitive):
         if aoSample is not None:
             sh.psOut.color.rgb = sh.psOut.color.rgb * aoSample.x
 
-        sh.emissive = sh.g_perObjectEmissiveFactor.rgb * sh.g_perFrameEmissiveFactor
+        sh.emissive = sh.g_perObjectPbrFactors.emissive.rgb * sh.g_perFrameEmissiveFactor
         emissiveSample = _sample_texture('emissive')
         if emissiveSample is not None:
             sh.emissive = sh.emissive * emissiveSample.rgb
