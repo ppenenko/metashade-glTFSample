@@ -69,19 +69,19 @@ def _generate_per_object_uniform_buffer(sh, is_ps : bool):
     if is_ps:
         # https://github.com/ppenenko/Cauldron/blob/master/src/DX12/shaders/PBRPixelParams.hlsl#L33
         sh.struct('PbrFactors')(
-            emissive = sh.RgbaF,
+            rgbaEmissive = sh.RgbaF,
 
             # pbrMetallicRoughness
-            baseColor = sh.RgbaF,
-            metallic = sh.Float,
-            roughness = sh.Float,
+            rgbaBaseColor = sh.RgbaF,
+            fMetallic = sh.Float,
+            fRoughness = sh.Float,
 
-            padding = sh.Float2,
+            f2Padding = sh.Float2,
 
-            #  KHR_materials_pbrSpecularGlossiness
-            diffuse = sh.RgbaF,
-            specular = sh.RgbF,
-            glossiness = sh.Float # float glossinessFactor;
+            # KHR_materials_pbrSpecularGlossiness
+            rgbaDiffuse = sh.RgbaF,
+            rgbSpecular = sh.RgbF,
+            fGlossiness = sh.Float
         )
 
     with sh.uniform_buffer(register = 1, name = 'cbPerObject'):
@@ -231,7 +231,7 @@ def _generate_ps(ps_file, material, primitive):
         if aoSample is not None:
             sh.psOut.color.rgb = sh.psOut.color.rgb * aoSample.x
 
-        sh.emissive = sh.g_perObjectPbrFactors.emissive.rgb * sh.g_perFrameEmissiveFactor
+        sh.emissive = sh.g_perObjectPbrFactors.rgbaEmissive.rgb * sh.g_perFrameEmissiveFactor
         emissiveSample = _sample_texture('emissive')
         if emissiveSample is not None:
             sh.emissive = sh.emissive * emissiveSample.rgb
