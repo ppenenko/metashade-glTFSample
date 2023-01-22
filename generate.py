@@ -28,7 +28,10 @@ def _generate_vs_out(sh, primitive):
             VsOut.texCoord('Tw', sh.Vector3f)
             VsOut.texCoord('Bw', sh.Vector3f)
 
-        VsOut.texCoord('UV0', sh.Point2f)
+        VsOut.texCoord('uv0', sh.Point2f)
+
+        if primitive.attributes.COLOR_0 is not None:
+            VsOut.color('rgbaColor0', sh.RgbaF)
 
 def _generate_per_frame_uniform_buffer(sh):
     sh.struct('Light')(
@@ -50,13 +53,13 @@ def _generate_per_frame_uniform_buffer(sh):
         sh.uniform('g_VpXf', sh.Matrix4x4f)
         sh.uniform('g_prevVpXf', sh.Matrix4x4f)
         sh.uniform('g_VpIXf', sh.Matrix4x4f)
-        sh.uniform('g_cameraPos', sh.Vector4f)
-        sh.uniform('g_iblFactor', sh.Float)
-        sh.uniform('g_perFrameEmissiveFactor', sh.Float)
-        sh.uniform('g_invScreenResolution', sh.Float2)
-        sh.uniform('g_wireframeOptions', sh.Float4)
-        sh.uniform('g_mCameraCurrJitter', sh.Float2)
-        sh.uniform('g_mCameraPrevJitter', sh.Float2)
+        sh.uniform('g_p4Camera', sh.Vector4f)
+        sh.uniform('g_fIblFactor', sh.Float)
+        sh.uniform('g_fPerFrameEmissiveFactor', sh.Float)
+        sh.uniform('g_fInvScreenResolution', sh.Float2)
+        sh.uniform('g_f4WireframeOptions', sh.Float4)
+        sh.uniform('g_f2MCameraCurrJitter', sh.Float2)
+        sh.uniform('g_f2MCameraPrevJitter', sh.Float2)
 
         # should be an array
         for light_idx in range(0, 80):
@@ -112,13 +115,13 @@ def _generate_vs(vs_file, primitive):
             VsIn.tangent('Tobj', sh.Vector4f)
 
         if attributes.TEXCOORD_0 is not None:
-            VsIn.texCoord('UV0', sh.Point2f)
+            VsIn.texCoord('uv0', sh.Point2f)
 
         if attributes.TEXCOORD_1 is not None:
-            VsIn.texCoord('UV1', sh.Point2f)
+            VsIn.texCoord('uv1', sh.Point2f)
 
         if attributes.COLOR_0 is not None:
-            VsIn.color('Color0', sh.RgbaF)
+            VsIn.color('rgbaColor0', sh.RgbaF)
 
         if attributes.JOINTS_0 is not None:
             raise RuntimeError('Unsupported attribute JOINTS_0')
@@ -135,13 +138,17 @@ def _generate_vs(vs_file, primitive):
         sh.vsOut.Pclip = sh.g_VpXf.xform(sh.Pw)
         sh.vsOut.Nw = sh.g_WorldXf.xform(sh.vsIn.Nobj).xyz.normalize()
         
-        if attributes.TANGENT is not None:
+        if hasattr(sh.vsIn, 'Tobj'):
             sh.vsOut.Tw = sh.g_WorldXf.xform(
                 sh.vsIn.Tobj.xyz.as_vector4()
             ).xyz.normalize()
             sh.vsOut.Bw = sh.vsOut.Nw.cross(sh.vsOut.Tw) * sh.vsIn.Tobj.w
 
-        sh.vsOut.UV0 = sh.vsIn.UV0
+        sh.vsOut.uv0 = sh.vsIn.uv0
+
+        for attr_name in ('uv1', 'rgbaColor0'):
+            if hasattr(sh.vsIn, attr_name):
+                setattr(sh.vsOut, attr_name, getattr(sh.vsIn, attr_name))
 
         sh.return_(sh.vsOut)
 
@@ -204,7 +211,7 @@ def _generate_ps(ps_file, material, primitive):
             uv_set_idx = gltf_texture.texCoord
             if uv_set_idx is None:
                 uv_set_idx = 0
-            uv = getattr(sh.psIn, f'UV{uv_set_idx}')
+            uv = getattr(sh.psIn, f'uv{uv_set_idx}')
             sampler = getattr(sh, texture_name + 'Sampler')
             return sampler(uv)
 
@@ -221,7 +228,10 @@ def _generate_ps(ps_file, material, primitive):
         sh.Nw = sh.Nw.normalize()
 
         sh.lambert = sh.g_light0.direction.dot(sh.Nw).saturate()
-        sh.baseColor = sh.baseColorTextureSampler(sh.psIn.UV0)
+        
+        sh.baseColor = sh.baseColorTextureSampler(sh.psIn.uv0) * sh.g_perObjectPbrFactors.rgbaBaseColor
+        if hasattr(sh.psIn, 'rgbaColor0'):
+            sh.baseColor = sh.baseColor * sh.psIn.rgbaColor0
         
         sh.psOut = sh.PsOut()
         sh.psOut.color.rgb = sh.lambert * sh.baseColor.rgb
@@ -231,7 +241,7 @@ def _generate_ps(ps_file, material, primitive):
         if aoSample is not None:
             sh.psOut.color.rgb = sh.psOut.color.rgb * aoSample.x
 
-        sh.emissive = sh.g_perObjectPbrFactors.rgbaEmissive.rgb * sh.g_perFrameEmissiveFactor
+        sh.emissive = sh.g_perObjectPbrFactors.rgbaEmissive.rgb * sh.g_fPerFrameEmissiveFactor
         emissiveSample = _sample_texture('emissive')
         if emissiveSample is not None:
             sh.emissive = sh.emissive * emissiveSample.rgb
