@@ -163,7 +163,7 @@ def _generate_ps(ps_file, material, primitive):
     _generate_vs_out(sh, primitive)
 
     with sh.ps_output('PsOut') as PsOut:
-        PsOut.SV_Target('color', sh.RgbaF)
+        PsOut.SV_Target('rgbaColor', sh.RgbaF)
 
     texture_dict = dict()
 
@@ -227,25 +227,25 @@ def _generate_ps(ps_file, material, primitive):
             sh.Nw = sh.psIn.Nw
         sh.Nw = sh.Nw.normalize()
 
-        sh.lambert = sh.g_light0.direction.dot(sh.Nw).saturate()
+        sh.fLambert = sh.g_light0.direction.dot(sh.Nw).saturate()
         
-        sh.baseColor = sh.baseColorTextureSampler(sh.psIn.uv0) * sh.g_perObjectPbrFactors.rgbaBaseColor
+        sh.rgbaBaseColor = sh.baseColorTextureSampler(sh.psIn.uv0) * sh.g_perObjectPbrFactors.rgbaBaseColor
         if hasattr(sh.psIn, 'rgbaColor0'):
-            sh.baseColor = sh.baseColor * sh.psIn.rgbaColor0
+            sh.rgbaBaseColor *= sh.psIn.rgbaColor0
         
         sh.psOut = sh.PsOut()
-        sh.psOut.color.rgb = sh.lambert * sh.baseColor.rgb
-        sh.psOut.color.a = sh.baseColor.a
+        sh.psOut.rgbaColor.rgb = sh.fLambert * sh.rgbaBaseColor.rgb
+        sh.psOut.rgbaColor.a = sh.rgbaBaseColor.a
 
         aoSample = _sample_texture('occlusion')
         if aoSample is not None:
-            sh.psOut.color.rgb = sh.psOut.color.rgb * aoSample.x
+            sh.psOut.rgbaColor.rgb *= aoSample.x
 
-        sh.emissive = sh.g_perObjectPbrFactors.rgbaEmissive.rgb * sh.g_fPerFrameEmissiveFactor
+        sh.rgbEmissive = sh.g_perObjectPbrFactors.rgbaEmissive.rgb * sh.g_fPerFrameEmissiveFactor
         emissiveSample = _sample_texture('emissive')
         if emissiveSample is not None:
-            sh.emissive = sh.emissive * emissiveSample.rgb
-        sh.psOut.color.rgb = sh.psOut.color.rgb + sh.emissive
+            sh.rgbEmissive *= emissiveSample.rgb
+        sh.psOut.rgbaColor.rgb += sh.rgbEmissive
 
         sh.return_(sh.psOut)
 
