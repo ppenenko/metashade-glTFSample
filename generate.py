@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse, os, pathlib
+from collections import namedtuple
 from pygltflib import GLTF2
 
 from metashade.hlsl.sm6 import ps_6_0, vs_6_0
@@ -166,11 +167,13 @@ def _generate_ps(ps_file, material, primitive):
         PsOut.SV_Target('rgbaColor', sh.RgbaF)
 
     texture_dict = dict()
+    _TextureRecord = namedtuple('_TextureRecord', 'gltf_texture texel_type')
 
     def _add_texture(parent, name: str, texel_type = None):
         name += 'Texture'
-        if getattr(parent, name) is not None:
-            texture_dict[name] = texel_type
+        gltf_texture = getattr(parent, name)
+        if gltf_texture is not None:
+            texture_dict[name] = _TextureRecord(gltf_texture, texel_type)
 
     _add_texture(material, 'normal')
     _add_texture(material, 'occlusion')
@@ -180,7 +183,11 @@ def _generate_ps(ps_file, material, primitive):
         _add_texture(
             material.pbrMetallicRoughness, 'baseColor', sh.RgbaF
         )
-        _add_texture(material.pbrMetallicRoughness, 'metallicRoughness')
+        _add_texture(
+            material.pbrMetallicRoughness,
+            'metallicRoughness',
+            sh.RgbaF
+        )
     elif material.extensions is not None:
         specularGlossiness = \
             material.extensions.KHR_materials_pbrSpecularGlossiness
@@ -193,22 +200,25 @@ def _generate_ps(ps_file, material, primitive):
             )
 
     # We're sorting material textures by name
-    for texture_idx, texture_name in enumerate(sorted(texture_dict)):
+    for texture_idx, (texture_name, texture_record) in enumerate(
+        sorted(texture_dict.items())
+    ):
         sh.combined_sampler_2d(
             texture_name = texture_name,
             texture_register = texture_idx,
             sampler_name = texture_name + 'Sampler',
             sampler_register = texture_idx,
-            texel_type = texture_dict[texture_name]
+            texel_type = texture_record.texel_type
         )
 
     with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
         def _sample_texture(texture_name : str):
             texture_name += 'Texture'
-            gltf_texture = getattr(material, texture_name)
-            if gltf_texture is None:
+            texture_record = texture_dict.get(texture_name)
+            if texture_record is None:
                 return None
-            uv_set_idx = gltf_texture.texCoord
+
+            uv_set_idx = texture_record.gltf_texture.texCoord
             if uv_set_idx is None:
                 uv_set_idx = 0
             uv = getattr(sh.psIn, f'uv{uv_set_idx}')
@@ -232,6 +242,8 @@ def _generate_ps(ps_file, material, primitive):
         sh.rgbaBaseColor = sh.baseColorTextureSampler(sh.psIn.uv0) * sh.g_perObjectPbrFactors.rgbaBaseColor
         if hasattr(sh.psIn, 'rgbaColor0'):
             sh.rgbaBaseColor *= sh.psIn.rgbaColor0
+
+        metallicRoughnessSample = _sample_texture('metallicRoughness') #unused for now
         
         sh.psOut = sh.PsOut()
         sh.psOut.rgbaColor.rgb = sh.fLambert * sh.rgbaBaseColor.rgb
