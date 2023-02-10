@@ -242,11 +242,23 @@ def _generate_ps(ps_file, material, primitive):
         sh.rgbaBaseColor = sh.baseColorTextureSampler(sh.psIn.uv0) * sh.g_perObjectPbrFactors.rgbaBaseColor
         if hasattr(sh.psIn, 'rgbaColor0'):
             sh.rgbaBaseColor *= sh.psIn.rgbaColor0
-
-        metallicRoughnessSample = _sample_texture('metallicRoughness') #unused for now
         
+        sh.fPerceptualRoughness = sh.g_perObjectPbrFactors.fRoughness
+        sh.fMetallic = sh.g_perObjectPbrFactors.fMetallic
+
+        metallicRoughnessSample = _sample_texture('metallicRoughness')
+        if metallicRoughnessSample is not None:
+            sh.fPerceptualRoughness *= metallicRoughnessSample.g
+            sh.fMetallic *= metallicRoughnessSample.b
+        
+        sh.fPerceptualRoughness = sh.fPerceptualRoughness.saturate()
+        sh.fMetallic = sh.fMetallic.saturate()
+
+        sh.fF0 = sh.Float(0.04)
+        sh.rgbDiffuse = sh.rgbaBaseColor.rgb * (sh.Float(1.0) - sh.fF0) * (sh.Float(1.0) - sh.fMetallic)
+
         sh.psOut = sh.PsOut()
-        sh.psOut.rgbaColor.rgb = sh.fLambert * sh.rgbaBaseColor.rgb
+        sh.psOut.rgbaColor.rgb = sh.fLambert * sh.rgbDiffuse
         sh.psOut.rgbaColor.a = sh.rgbaBaseColor.a
 
         aoSample = _sample_texture('occlusion')
