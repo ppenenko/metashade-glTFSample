@@ -256,6 +256,7 @@ def _generate_ps(ps_file, material, primitive):
 
         sh.fF0 = sh.Float(0.04)
         sh.rgbDiffuse = sh.rgbaBaseColor.rgb * (sh.Float(1.0) - sh.fF0) * (sh.Float(1.0) - sh.fMetallic)
+        sh.rgbSpecular = sh.Float3(sh.fMetallic).lerp(sh.fF0, sh.rgbaBaseColor.rgb)
 
         sh.psOut = sh.PsOut()
         sh.psOut.rgbaColor.rgb = sh.fLambert * sh.rgbDiffuse
