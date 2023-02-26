@@ -223,7 +223,8 @@ def _generate_ps(ps_file, material, primitive):
                 uv_set_idx = 0
             uv = getattr(sh.psIn, f'uv{uv_set_idx}')
             sampler = getattr(sh, texture_name + 'Sampler')
-            return sampler(uv)
+            setattr(sh, texture_name + 'Sample', sampler(uv))
+            return getattr(sh, texture_name + 'Sample')
 
         normalSample = _sample_texture('normal')
         if (normalSample is not None
