@@ -211,35 +211,27 @@ def _generate_ps(ps_file, material, primitive):
             texel_type = texture_record.texel_type
         )
 
-    with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
-        def _sample_texture(texture_name : str):
-            texture_name += 'Texture'
-            texture_record = texture_dict.get(texture_name)
-            if texture_record is None:
-                return None
+    def _sample_texture(texture_name : str):
+        texture_name += 'Texture'
+        texture_record = texture_dict.get(texture_name)
+        if texture_record is None:
+            return None
 
-            uv_set_idx = texture_record.gltf_texture.texCoord
-            if uv_set_idx is None:
-                uv_set_idx = 0
-            uv = getattr(sh.psIn, f'uv{uv_set_idx}')
-            sampler = getattr(sh, texture_name + 'Sampler')
-            setattr(sh, texture_name + 'Sample', sampler(uv))
-            return getattr(sh, texture_name + 'Sample')
+        uv_set_idx = texture_record.gltf_texture.texCoord
+        if uv_set_idx is None:
+            uv_set_idx = 0
+        uv = getattr(sh.psIn, f'uv{uv_set_idx}')
+        sampler = getattr(sh, texture_name + 'Sampler')
+        setattr(sh, texture_name + 'Sample', sampler(uv))
+        return getattr(sh, texture_name + 'Sample')
 
-        normalSample = _sample_texture('normal')
-        if (normalSample is not None
-            and primitive.attributes.TANGENT is not None
-        ):
-            sh.tbn = sh.Matrix3x3f(rows = (sh.psIn.Tw, sh.psIn.Bw, sh.psIn.Nw))
-            sh.tbn = sh.tbn.transpose()
-            sh.Nw = sh.tbn.xform(2.0 * normalSample.xyz - sh.Float3(1.0))
-        else:
-            print ('TODO: https://github.com/ppenenko/metashade/issues/19')
-            sh.Nw = sh.psIn.Nw
-        sh.Nw = sh.Nw.normalize()
+    sh.struct('PbrParams')(
+        rgbDiffuse = sh.RgbF,
+        rgbSpecular = sh.RgbF,
+        fOpacity = sh.Float
+    )
 
-        sh.fLambert = sh.g_light0.direction.dot(sh.Nw).saturate()
-        
+    with sh.function('metallicRoughness', sh.PbrParams)(psIn = sh.VsOut):
         sh.rgbaBaseColor = sh.baseColorTextureSampler(sh.psIn.uv0) * sh.g_perObjectPbrFactors.rgbaBaseColor
         if hasattr(sh.psIn, 'rgbaColor0'):
             sh.rgbaBaseColor *= sh.psIn.rgbaColor0
@@ -254,14 +246,33 @@ def _generate_ps(ps_file, material, primitive):
         
         sh.fPerceptualRoughness = sh.fPerceptualRoughness.saturate()
         sh.fMetallic = sh.fMetallic.saturate()
-
         sh.fF0 = sh.Float(0.04)
-        sh.rgbDiffuse = sh.rgbaBaseColor.rgb * (sh.Float(1.0) - sh.fF0) * (sh.Float(1.0) - sh.fMetallic)
-        sh.rgbSpecular = sh.Float3(sh.fMetallic).lerp(sh.fF0, sh.rgbaBaseColor.rgb)
 
+        sh.result = sh.PbrParams()
+        sh.result.rgbDiffuse = sh.rgbaBaseColor.rgb * (sh.Float(1.0) - sh.fF0) * (sh.Float(1.0) - sh.fMetallic)
+        sh.result.rgbSpecular = sh.RgbF(sh.fMetallic).lerp(sh.fF0, sh.rgbaBaseColor.rgb)
+        sh.result.fOpacity = sh.rgbaBaseColor.a
+        sh.return_(sh.result)
+
+    with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
+        normalSample = _sample_texture('normal')
+        if (normalSample is not None
+            and primitive.attributes.TANGENT is not None
+        ):
+            sh.tbn = sh.Matrix3x3f(rows = (sh.psIn.Tw, sh.psIn.Bw, sh.psIn.Nw))
+            sh.tbn = sh.tbn.transpose()
+            sh.Nw = sh.tbn.xform(2.0 * normalSample.xyz - sh.Float3(1.0))
+        else:
+            print ('TODO: https://github.com/ppenenko/metashade/issues/19')
+            sh.Nw = sh.psIn.Nw
+        sh.Nw = sh.Nw.normalize()
+
+        sh.fLambert = sh.g_light0.direction.dot(sh.Nw).saturate()
+        sh.pbrParams = sh.metallicRoughness(psIn = sh.psIn)
+        
         sh.psOut = sh.PsOut()
-        sh.psOut.rgbaColor.rgb = sh.fLambert * sh.rgbDiffuse
-        sh.psOut.rgbaColor.a = sh.rgbaBaseColor.a
+        sh.psOut.rgbaColor.rgb = sh.fLambert * sh.pbrParams.rgbDiffuse
+        sh.psOut.rgbaColor.a = sh.pbrParams.fOpacity
 
         aoSample = _sample_texture('occlusion')
         if aoSample is not None:
