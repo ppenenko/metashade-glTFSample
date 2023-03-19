@@ -232,7 +232,8 @@ def _generate_ps(ps_file, material, primitive):
     )
 
     with sh.function('metallicRoughness', sh.PbrParams)(psIn = sh.VsOut):
-        sh.rgbaBaseColor = sh.baseColorTextureSampler(sh.psIn.uv0) * sh.g_perObjectPbrFactors.rgbaBaseColor
+        sh.rgbaBaseColor = sh.baseColorTextureSampler(sh.psIn.uv0) \
+            * sh.g_perObjectPbrFactors.rgbaBaseColor
         if hasattr(sh.psIn, 'rgbaColor0'):
             sh.rgbaBaseColor *= sh.psIn.rgbaColor0
         
@@ -249,8 +250,11 @@ def _generate_ps(ps_file, material, primitive):
         sh.fF0 = sh.Float(0.04)
 
         sh.result = sh.PbrParams()
-        sh.result.rgbDiffuse = sh.rgbaBaseColor.rgb * (sh.Float(1.0) - sh.fF0) * (sh.Float(1.0) - sh.fMetallic)
-        sh.result.rgbSpecular = sh.RgbF(sh.fMetallic).lerp(sh.fF0, sh.rgbaBaseColor.rgb)
+        sh.result.rgbDiffuse = sh.rgbaBaseColor.rgb \
+            * (sh.Float(1.0) - sh.fF0) \
+            * (sh.Float(1.0) - sh.fMetallic)
+        sh.result.rgbSpecular = \
+            sh.RgbF(sh.fMetallic).lerp(sh.fF0, sh.rgbaBaseColor.rgb)
         sh.result.fOpacity = sh.rgbaBaseColor.a
         sh.return_(sh.result)
 
