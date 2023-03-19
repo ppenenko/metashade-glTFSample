@@ -254,6 +254,11 @@ def _generate_ps(ps_file, material, primitive):
         sh.result.fOpacity = sh.rgbaBaseColor.a
         sh.return_(sh.result)
 
+    with sh.function('F_Schlick', sh.Float)(LdotH = sh.Float, fF0 = sh.Float):
+        sh.return_(
+            sh.fF0 + (sh.Float(1.0) - sh.fF0) * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
+        )
+
     with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
         normalSample = _sample_texture('normal')
         if (normalSample is not None
