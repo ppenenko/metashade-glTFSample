@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse, os, pathlib
+import argparse, math, os, pathlib
 from collections import namedtuple
 from pygltflib import GLTF2
 
@@ -258,6 +258,9 @@ def _generate_ps(ps_file, material, primitive):
         sh.return_(
             sh.fF0 + (sh.Float(1.0) - sh.fF0) * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
         )
+
+    with sh.function('Fd_Lambert', sh.Float)():
+        sh.return_( sh.Float( 1.0 / math.pi ) )
 
     with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
         normalSample = _sample_texture('normal')
