@@ -258,7 +258,9 @@ def _generate_ps(ps_file, material, primitive):
         sh.result.fOpacity = sh.rgbaBaseColor.a
         sh.return_(sh.result)
 
-    with sh.function('D_GGX', sh.Float)(NdotH = sh.Float, fAlphaRoughness = sh.Float):
+    with sh.function('D_GGX', sh.Float)(
+        NdotH = sh.Float, fAlphaRoughness = sh.Float
+    ):
         sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
         sh.fF = (sh.NdotH * sh.fASqr - sh.NdotH) * sh.NdotH + sh.Float(1.0)
         sh.return_(
@@ -267,8 +269,21 @@ def _generate_ps(ps_file, material, primitive):
 
     with sh.function('F_Schlick', sh.Float)(LdotH = sh.Float, fF0 = sh.Float):
         sh.return_(
-            sh.fF0 + (sh.Float(1.0) - sh.fF0) * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
+            sh.fF0 + (sh.Float(1.0) - sh.fF0) \
+                * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
         )
+
+    with sh.function('V_SmithGGXCorrelated', sh.Float)(
+        NdotV = sh.Float, NdotL = sh.Float, fAlphaRoughness = sh.Float
+    ):
+        sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
+        sh.fGgxL = sh.NdotV * (
+            (sh.NdotL - sh.NdotL * sh.fASqr) * sh.NdotL + sh.fASqr
+        ).sqrt()
+        sh.fGgxV = sh.NdotL * (
+            (sh.NdotV - sh.NdotV * sh.fASqr) + sh.NdotV + sh.fASqr
+        ).sqrt()
+        sh.return_(sh.Float(0.5) / (sh.fGgxL + sh.fGgxV))
 
     with sh.function('Fd_Lambert', sh.Float)():
         sh.return_( sh.Float( 1.0 / math.pi ) )
