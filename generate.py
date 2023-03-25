@@ -147,9 +147,8 @@ def _generate_vs(vs_file, primitive):
             ).xyz.normalize()
             sh.vsOut.Bw = sh.vsOut.Nw.cross(sh.vsOut.Tw) * sh.vsIn.Tobj.w
 
-        sh.vsOut.uv0 = sh.vsIn.uv0
-
-        for attr_name in ('uv1', 'rgbaColor0'):
+        # Simple passthrough for these attributes
+        for attr_name in ('uv0', 'uv1', 'rgbaColor0'):
             if hasattr(sh.vsIn, attr_name):
                 setattr(sh.vsOut, attr_name, getattr(sh.vsIn, attr_name))
 
