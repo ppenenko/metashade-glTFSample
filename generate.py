@@ -40,16 +40,16 @@ def _generate_per_frame_uniform_buffer(sh):
     sh.struct('Light')(
         VpXf = sh.Matrix4x4f,
         ViewXf = sh.Matrix4x4f,
-        direction = sh.Vector3f,
-        range = sh.Float,
-        color = sh.RgbF,
-        intensity = sh.Float,
-        position = sh.Point3f,
-        innerConeCos = sh.Float,
-        outerConeCos = sh.Float,
+        v3DirectionW = sh.Vector3f,
+        fRange = sh.Float,
+        rgbColor = sh.RgbF,
+        fIntensity = sh.Float,
+        Pw = sh.Point3f,
+        fInnerConeCos = sh.Float,
+        fOuterConeCos = sh.Float,
         type_ = sh.Float, # should be an int, but we assume a spotlight anyway
-        depthBias = sh.Float,
-        shadowMapIndex = sh.Float # should be an int, unused for now
+        fDepthBias = sh.Float,
+        iShadowMap = sh.Float # should be an int, unused for now
     )
 
     with sh.uniform_buffer(register = 0, name = 'cbPerFrame'):
@@ -345,11 +345,12 @@ def _generate_ps(ps_file, material, primitive):
         
         sh.psOut = sh.PsOut()
         sh.psOut.rgbaColor.rgb = sh.pbrBrdf(
-            L = sh.g_light0.direction,
+            L = sh.g_light0.v3DirectionW,
             N = sh.Nw,
             V = sh.Vw,
             pbrParams = sh.pbrParams
-        )
+        ) * sh.g_light0.fIntensity * sh.g_light0.rgbColor
+        
         sh.psOut.rgbaColor.a = sh.pbrParams.fOpacity
 
         aoSample = _sample_texture('occlusion')
