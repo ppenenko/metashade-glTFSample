@@ -24,7 +24,9 @@ def _generate_vs_out(sh, primitive):
     with sh.vs_output('VsOut') as VsOut:
         VsOut.SV_Position('Pclip', sh.Vector4f)
         
+        VsOut.texCoord('Pw', sh.Vector3f)
         VsOut.texCoord('Nw', sh.Vector3f)
+
         if primitive.attributes.TANGENT is not None:
             VsOut.texCoord('Tw', sh.Vector3f)
             VsOut.texCoord('Bw', sh.Vector3f)
@@ -134,9 +136,9 @@ def _generate_vs(vs_file, primitive):
 
     with sh.main(_vs_main, sh.VsOut)(vsIn = sh.VsIn):
         sh.Pw = sh.g_WorldXf.xform(sh.vsIn.Pobj)
-
         sh.vsOut = sh.VsOut()
         sh.vsOut.Pclip = sh.g_VpXf.xform(sh.Pw)
+        sh.vsOut.Pw = sh.Pw.xyz
         sh.vsOut.Nw = sh.g_WorldXf.xform(sh.vsIn.Nobj).xyz.normalize()
         
         if hasattr(sh.vsIn, 'Tobj'):
@@ -175,7 +177,7 @@ def _generate_ps(ps_file, material, primitive):
         if gltf_texture is not None:
             texture_dict[name] = _TextureRecord(gltf_texture, texel_type)
 
-    _add_texture(material, 'normal')
+    _add_texture(material, 'normal', sh.Vector4f)
     _add_texture(material, 'occlusion')
     _add_texture(material, 'emissive', sh.RgbaF)
 
@@ -333,17 +335,22 @@ def _generate_ps(ps_file, material, primitive):
         ):
             sh.tbn = sh.Matrix3x3f(rows = (sh.psIn.Tw, sh.psIn.Bw, sh.psIn.Nw))
             sh.tbn = sh.tbn.transpose()
-            sh.Nw = sh.tbn.xform(2.0 * normalSample.xyz - sh.Float3(1.0))
+            sh.Nw = sh.tbn.xform(2.0 * normalSample.xyz - sh.Vector3f(1.0))
         else:
             print ('TODO: https://github.com/ppenenko/metashade/issues/19')
             sh.Nw = sh.psIn.Nw
         sh.Nw = sh.Nw.normalize()
 
-        sh.fLambert = sh.g_light0.direction.dot(sh.Nw).saturate()
+        sh.Vw = (sh.g_p4Camera.xyz - sh.psIn.Pw).normalize()
         sh.pbrParams = sh.metallicRoughness(psIn = sh.psIn)
         
         sh.psOut = sh.PsOut()
-        sh.psOut.rgbaColor.rgb = sh.fLambert * sh.pbrParams.rgbDiffuse
+        sh.psOut.rgbaColor.rgb = sh.pbrBrdf(
+            L = sh.g_light0.direction,
+            N = sh.Nw,
+            V = sh.Vw,
+            pbrParams = sh.pbrParams
+        )
         sh.psOut.rgbaColor.a = sh.pbrParams.fOpacity
 
         aoSample = _sample_texture('occlusion')
