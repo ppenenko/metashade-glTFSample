@@ -227,7 +227,8 @@ def _generate_ps(ps_file, material, primitive):
 
     sh.struct('PbrParams')(
         rgbDiffuse = sh.RgbF,
-        rgbSpecular = sh.RgbF,
+        rgbF0 = sh.RgbF,
+        fPerceptualRoughness = sh.Float,
         fOpacity = sh.Float
     )
 
@@ -244,21 +245,22 @@ def _generate_ps(ps_file, material, primitive):
         if metallicRoughnessSample is not None:
             sh.fPerceptualRoughness *= metallicRoughnessSample.g
             sh.fMetallic *= metallicRoughnessSample.b
-        
-        sh.fPerceptualRoughness = sh.fPerceptualRoughness.saturate()
+
         sh.fMetallic = sh.fMetallic.saturate()
-        sh.fF0 = sh.Float(0.04)
+        sh.fMinF0 = sh.Float(0.04)
 
-        sh.result = sh.PbrParams()
-        sh.result.rgbDiffuse = sh.rgbaBaseColor.rgb \
-            * (sh.Float(1.0) - sh.fF0) \
+        sh.pbrParams = sh.PbrParams()
+        sh.pbrParams.rgbDiffuse = sh.rgbaBaseColor.rgb \
+            * (sh.Float(1.0) - sh.fMinF0) \
             * (sh.Float(1.0) - sh.fMetallic)
-        sh.result.rgbSpecular = \
-            sh.RgbF(sh.fMetallic).lerp(sh.fF0, sh.rgbaBaseColor.rgb)
-        sh.result.fOpacity = sh.rgbaBaseColor.a
-        sh.return_(sh.result)
+        sh.pbrParams.rgbF0 = sh.RgbF(sh.fMetallic).lerp(
+            sh.RgbF(sh.fMinF0), sh.rgbaBaseColor.rgb
+        )
+        sh.pbrParams.fPerceptualRoughness = sh.fPerceptualRoughness.saturate()
+        sh.pbrParams.fOpacity = sh.rgbaBaseColor.a
+        sh.return_(sh.pbrParams)
 
-    with sh.function('D_GGX', sh.Float)(
+    with sh.function('D_Ggx', sh.Float)(
         NdotH = sh.Float, fAlphaRoughness = sh.Float
     ):
         sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
@@ -267,13 +269,13 @@ def _generate_ps(ps_file, material, primitive):
             sh.fASqr / (sh.Float(math.pi) * sh.fF * sh.fF )
         )
 
-    with sh.function('F_Schlick', sh.Float)(LdotH = sh.Float, fF0 = sh.Float):
+    with sh.function('F_Schlick', sh.RgbF)(LdotH = sh.Float, rgbF0 = sh.RgbF):
         sh.return_(
-            sh.fF0 + (sh.Float(1.0) - sh.fF0) \
+            sh.rgbF0 + (sh.RgbF(1.0) - sh.rgbF0) \
                 * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
         )
 
-    with sh.function('V_SmithGGXCorrelated', sh.Float)(
+    with sh.function('V_SmithGgxCorrelated', sh.Float)(
         NdotV = sh.Float, NdotL = sh.Float, fAlphaRoughness = sh.Float
     ):
         sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
@@ -287,6 +289,42 @@ def _generate_ps(ps_file, material, primitive):
 
     with sh.function('Fd_Lambert', sh.Float)():
         sh.return_( sh.Float( 1.0 / math.pi ) )
+
+    with sh.function('pbrBrdf', sh.RgbF)(
+        L = sh.Vector3f, N = sh.Vector3f, V = sh.Vector3f,
+        pbrParams = sh.PbrParams
+    ):
+        sh.H = (sh.V + sh.L).normalize()
+
+        sh.NdotV = sh.N.dot(sh.V).abs()
+
+        for first, second in (('N', 'L'), ('N', 'H'), ('L', 'H')):
+            setattr(
+                sh,
+                f'{first}dot{second}',
+                getattr(sh, first).dot(getattr(sh, second)).saturate()
+            )
+
+        sh.fAlphaRoughness = sh.pbrParams.fPerceptualRoughness \
+            * sh.pbrParams.fPerceptualRoughness
+
+        sh.fD = sh.D_Ggx(
+            NdotH = sh.NdotH,
+            fAlphaRoughness = sh.fAlphaRoughness
+        )
+        sh.rgbF = sh.F_Schlick(
+            LdotH = sh.LdotH, rgbF0 = sh.pbrParams.rgbF0
+        )
+        sh.fV = sh.V_SmithGgxCorrelated(
+            NdotV = sh.NdotV,
+            NdotL = sh.NdotL,
+            fAlphaRoughness = sh.fAlphaRoughness
+        )
+
+        sh.rgbFr = (sh.fD * sh.fV) * sh.rgbF
+        sh.rgbFd = sh.pbrParams.rgbDiffuse * sh.Fd_Lambert()
+        
+        sh.return_(sh.NdotL * (sh.rgbFr + sh.rgbFd))
 
     with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
         normalSample = _sample_texture('normal')
