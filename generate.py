@@ -327,6 +327,18 @@ def _generate_ps(ps_file, material, primitive):
         
         sh.return_(sh.NdotL * (sh.rgbFr + sh.rgbFd))
 
+    with sh.function('applySpotLight', sh.RgbF)(
+        light = sh.Light,
+        Nw = sh.Vector3f, Vw = sh.Vector3f,
+        pbrParams = sh.PbrParams
+    ):
+        sh.return_( sh.pbrBrdf(
+            L = sh.light.v3DirectionW,
+            N = sh.Nw,
+            V = sh.Vw,
+            pbrParams = sh.pbrParams
+        ) * sh.light.fIntensity * sh.light.rgbColor )
+
     with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
         normalSample = _sample_texture('normal')
         if (normalSample is not None
@@ -344,12 +356,12 @@ def _generate_ps(ps_file, material, primitive):
         sh.pbrParams = sh.metallicRoughness(psIn = sh.psIn)
         
         sh.psOut = sh.PsOut()
-        sh.psOut.rgbaColor.rgb = sh.pbrBrdf(
-            L = sh.g_light0.v3DirectionW,
-            N = sh.Nw,
-            V = sh.Vw,
+        sh.psOut.rgbaColor.rgb = sh.applySpotLight(
+            light = sh.g_light0,
+            Nw = sh.Nw,
+            Vw = sh.Vw,
             pbrParams = sh.pbrParams
-        ) * sh.g_light0.fIntensity * sh.g_light0.rgbColor
+        )
         
         sh.psOut.rgbaColor.a = sh.pbrParams.fOpacity
 
