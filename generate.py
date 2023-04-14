@@ -327,6 +327,15 @@ def _generate_ps(ps_file, material, primitive):
         
         sh.return_(sh.NdotL * (sh.rgbFr + sh.rgbFd))
 
+    with sh.function('getRangeAttenuation', sh.Float)(
+        light = sh.Light, d = sh.Float
+    ):
+        # https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
+        # TODO: handle undefined/unlimited ranges
+        sh.return_(
+            (sh.d / sh.light.fRange).lerp(sh.Float(1), sh.Float(0)).saturate()
+        )
+
     with sh.function('applySpotLight', sh.RgbF)(
         light = sh.Light,
         Nw = sh.Vector3f, Vw = sh.Vector3f,
