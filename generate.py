@@ -56,7 +56,8 @@ def _generate_per_frame_uniform_buffer(sh):
         sh.uniform('g_VpXf', sh.Matrix4x4f)
         sh.uniform('g_prevVpXf', sh.Matrix4x4f)
         sh.uniform('g_VpIXf', sh.Matrix4x4f)
-        sh.uniform('g_p4Camera', sh.Vector4f)
+        sh.uniform('g_cameraPw', sh.Vector3f)
+        sh.uniform('g_cameraPw_fPadding', sh.Float)
         sh.uniform('g_fIblFactor', sh.Float)
         sh.uniform('g_fPerFrameEmissiveFactor', sh.Float)
         sh.uniform('g_fInvScreenResolution', sh.Float2)
@@ -361,7 +362,7 @@ def _generate_ps(ps_file, material, primitive):
             sh.Nw = sh.psIn.Nw
         sh.Nw = sh.Nw.normalize()
 
-        sh.Vw = (sh.g_p4Camera.xyz - sh.psIn.Pw).normalize()
+        sh.Vw = (sh.g_cameraPw - sh.psIn.Pw).normalize()
         sh.pbrParams = sh.metallicRoughness(psIn = sh.psIn)
         
         sh.psOut = sh.PsOut()
