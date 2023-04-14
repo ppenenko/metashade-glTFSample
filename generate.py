@@ -143,9 +143,7 @@ def _generate_vs(vs_file, primitive):
         sh.vsOut.Nw = sh.g_WorldXf.xform(sh.vsIn.Nobj).xyz.normalize()
         
         if hasattr(sh.vsIn, 'Tobj'):
-            sh.vsOut.Tw = sh.g_WorldXf.xform(
-                sh.vsIn.Tobj.xyz.as_vector4()
-            ).xyz.normalize()
+            sh.vsOut.Tw = sh.g_WorldXf.xform(sh.vsIn.Tobj.xyz).xyz.normalize()
             sh.vsOut.Bw = sh.vsOut.Nw.cross(sh.vsOut.Tw) * sh.vsIn.Tobj.w
 
         # Simple passthrough for these attributes
