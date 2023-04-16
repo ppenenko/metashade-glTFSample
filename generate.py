@@ -100,7 +100,11 @@ def _generate_per_object_uniform_buffer(sh, is_ps : bool):
 _vs_main = 'mainVS'
 
 def _generate_vs(vs_file, primitive):
-    sh = vs_6_0.Generator(vs_file)
+    sh = vs_6_0.Generator(
+        vs_file,
+        # the host app supplies transposed matrix uniforms
+        matrix_post_multiplication = True
+    )
 
     _generate_per_frame_uniform_buffer(sh)
     _generate_per_object_uniform_buffer(sh, is_ps = False)
@@ -156,7 +160,11 @@ def _generate_vs(vs_file, primitive):
 _ps_main = 'mainPS'
 
 def _generate_ps(ps_file, material, primitive):
-    sh = ps_6_0.Generator(ps_file)
+    sh = ps_6_0.Generator(
+        ps_file,
+        # the host app supplies transposed matrix uniforms
+        matrix_post_multiplication = True
+    )
 
     _generate_per_frame_uniform_buffer(sh)
     _generate_per_object_uniform_buffer(sh, is_ps = True)
