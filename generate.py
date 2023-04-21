@@ -345,11 +345,16 @@ def _generate_ps(ps_file, material, primitive):
 
     with sh.function('applySpotLight', sh.RgbF)(
         light = sh.Light,
-        Nw = sh.Vector3f, Vw = sh.Vector3f,
+        Nw = sh.Vector3f,
+        Vw = sh.Vector3f,
+        Pw = sh.Point3f,
         pbrParams = sh.PbrParams
     ):
+        sh.L = sh.light.Pw - sh.Pw
+        sh.d = sh.L.length()
+
         sh.return_( sh.pbrBrdf(
-            L = sh.light.v3DirectionW,
+            L = sh.L.normalize(),
             N = sh.Nw,
             V = sh.Vw,
             pbrParams = sh.pbrParams
@@ -374,6 +379,7 @@ def _generate_ps(ps_file, material, primitive):
         sh.psOut = sh.PsOut()
         sh.psOut.rgbaColor.rgb = sh.applySpotLight(
             light = sh.g_light0,
+            Pw = sh.psIn.Pw,
             Nw = sh.Nw,
             Vw = sh.Vw,
             pbrParams = sh.pbrParams
