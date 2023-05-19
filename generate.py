@@ -245,6 +245,9 @@ def _generate_ps(ps_file, material, primitive):
             * sh.g_perObjectPbrFactors.rgbaBaseColor
         if hasattr(sh.psIn, 'rgbaColor0'):
             sh.rgbaBaseColor *= sh.psIn.rgbaColor0
+
+        if material.alphaMode == 'BLEND':
+            sh.rgbaBaseColor.a.clip()
         
         sh.fPerceptualRoughness = sh.g_perObjectPbrFactors.fRoughness
         sh.fMetallic = sh.g_perObjectPbrFactors.fMetallic
