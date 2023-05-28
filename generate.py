@@ -248,6 +248,9 @@ def _generate_ps(ps_file, material, primitive):
 
         if material.alphaMode == 'BLEND':
             sh.rgbaBaseColor.a.clip()
+        elif material.alphaMode == 'MASK':
+            sh.fAlphaCutoff = sh.Float(float(material.alphaCutoff))
+            (sh.rgbaBaseColor.a - sh.fAlphaCutoff).clip()
         
         sh.fPerceptualRoughness = sh.g_perObjectPbrFactors.fRoughness
         sh.fMetallic = sh.g_perObjectPbrFactors.fMetallic
