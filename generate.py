@@ -179,8 +179,7 @@ def _generate_ps(ps_file, material, primitive):
     _TextureRecord = namedtuple('_TextureRecord', 'gltf_texture texel_type')
 
     def _add_texture(parent, name: str, texel_type = None):
-        name += 'Texture'
-        gltf_texture = getattr(parent, name)
+        gltf_texture = getattr(parent, name + 'Texture')
         if gltf_texture is not None:
             texture_dict[name] = _TextureRecord(gltf_texture, texel_type)
 
@@ -207,21 +206,26 @@ def _generate_ps(ps_file, material, primitive):
                 'KHR_materials_pbrSpecularGlossiness is not implemented yet, '
                 'see https://github.com/ppenenko/metashade/issues/18'
             )
+    
+    def _get_texture_uniform_name(name: str) -> str:
+        return 'g_t' + name[0].upper() + name[1:]
+    
+    def _get_sampler_uniform_name(name: str) -> str:
+        return 'g_s' + name[0].upper() + name[1:]
 
     # We're sorting material textures by name
     for texture_idx, (texture_name, texture_record) in enumerate(
         sorted(texture_dict.items())
-    ):
+    ):  
         sh.combined_sampler_2d(
-            texture_name = texture_name,
+            texture_name = _get_texture_uniform_name(texture_name),
             texture_register = texture_idx,
-            sampler_name = texture_name + 'Sampler',
+            sampler_name = _get_sampler_uniform_name(texture_name),
             sampler_register = texture_idx,
             texel_type = texture_record.texel_type
         )
 
-    def _sample_texture(texture_name : str):
-        texture_name += 'Texture'
+    def _sample_texture(texture_name : str):        
         texture_record = texture_dict.get(texture_name)
         if texture_record is None:
             return None
@@ -231,7 +235,7 @@ def _generate_ps(ps_file, material, primitive):
             uv_set_idx = 0
 
         uv = getattr(sh.psIn, f'uv{uv_set_idx}')
-        sampler = getattr(sh, texture_name + 'Sampler')
+        sampler = getattr(sh, _get_sampler_uniform_name(texture_name))
 
         sample = sampler(uv, lod_bias = sh.g_lodBias)
         sample_var_name = texture_name + 'Sample'
@@ -246,7 +250,7 @@ def _generate_ps(ps_file, material, primitive):
     )
 
     with sh.function('metallicRoughness', sh.PbrParams)(psIn = sh.VsOut):
-        sh.rgbaBaseColor = sh.baseColorTextureSampler(sh.psIn.uv0) \
+        sh.rgbaBaseColor = sh.g_sBaseColor(sh.psIn.uv0) \
             * sh.g_perObjectPbrFactors.rgbaBaseColor
         if hasattr(sh.psIn, 'rgbaColor0'):
             sh.rgbaBaseColor *= sh.psIn.rgbaColor0
