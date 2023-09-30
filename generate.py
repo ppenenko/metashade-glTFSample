@@ -228,6 +228,24 @@ def _generate_ps(ps_file, material, primitive):
             register = texture_idx
         )
 
+    for ibl_texture_def in [
+        ('iblBrdfLut', sh.Texture2d),
+        ('iblDiffuse', sh.TextureCube),
+        ('iblSpecular', sh.TextureCube)
+    ]:
+        texture_idx += 1
+        texture_name = ibl_texture_def[0]
+        sh.uniform(
+            _get_texture_uniform_name(texture_name),
+            ibl_texture_def[1],
+            register = texture_idx
+        )
+        sh.uniform(
+            _get_sampler_uniform_name(texture_name),
+            sh.Sampler,
+            register = texture_idx
+        )
+
     shadow_map_register = 9
     sh.uniform('g_tShadowMap', sh.Texture2d, register = shadow_map_register)
     sh.uniform('g_sShadowMap', sh.SamplerCmp, register = shadow_map_register)
