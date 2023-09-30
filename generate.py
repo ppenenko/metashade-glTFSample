@@ -175,23 +175,23 @@ def _generate_ps(ps_file, material, primitive):
     with sh.ps_output('PsOut') as PsOut:
         PsOut.SV_Target('rgbaColor', sh.RgbaF)
 
-    texture_dict = dict()
-    _TextureRecord = namedtuple('_TextureRecord', 'gltf_texture texel_type')
+    material_textures = dict()
+    _MaterialTexture = namedtuple('_MaterialTexture', 'gltf_texture texel_type')
 
-    def _add_texture(parent, name: str, texel_type = None):
+    def _def_material_texture(parent, name: str, texel_type = None):
         gltf_texture = getattr(parent, name + 'Texture')
         if gltf_texture is not None:
-            texture_dict[name] = _TextureRecord(gltf_texture, texel_type)
+            material_textures[name] = _MaterialTexture(gltf_texture, texel_type)
 
-    _add_texture(material, 'normal', sh.Vector4f)
-    _add_texture(material, 'occlusion')
-    _add_texture(material, 'emissive', sh.RgbaF)
+    _def_material_texture(material, 'normal', sh.Vector4f)
+    _def_material_texture(material, 'occlusion')
+    _def_material_texture(material, 'emissive', sh.RgbaF)
 
     if material.pbrMetallicRoughness is not None:
-        _add_texture(
+        _def_material_texture(
             material.pbrMetallicRoughness, 'baseColor', sh.RgbaF
         )
-        _add_texture(
+        _def_material_texture(
             material.pbrMetallicRoughness,
             'metallicRoughness',
             sh.RgbaF
@@ -200,8 +200,8 @@ def _generate_ps(ps_file, material, primitive):
         specularGlossiness = \
             material.extensions.KHR_materials_pbrSpecularGlossiness
         if specularGlossiness is not None:
-            _add_texture(specularGlossiness, 'diffuse', sh.RgbaF)
-            _add_texture(specularGlossiness, 'specularGlossiness')
+            _def_material_texture(specularGlossiness, 'diffuse', sh.RgbaF)
+            _def_material_texture(specularGlossiness, 'specularGlossiness')
             assert (False,
                 'KHR_materials_pbrSpecularGlossiness is not implemented yet, '
                 'see https://github.com/ppenenko/metashade/issues/18'
@@ -214,12 +214,12 @@ def _generate_ps(ps_file, material, primitive):
         return 'g_s' + name[0].upper() + name[1:]
 
     # We're sorting material textures by name
-    for texture_idx, (texture_name, texture_record) in enumerate(
-        sorted(texture_dict.items())
+    for texture_idx, (texture_name, material_texture) in enumerate(
+        sorted(material_textures.items())
     ):
         sh.uniform(
             _get_texture_uniform_name(texture_name),
-            sh.Texture2d(texel_type = texture_record.texel_type),
+            sh.Texture2d(texel_type = material_texture.texel_type),
             register = texture_idx
         )
         sh.uniform(
@@ -250,12 +250,12 @@ def _generate_ps(ps_file, material, primitive):
     sh.uniform('g_tShadowMap', sh.Texture2d, register = shadow_map_register)
     sh.uniform('g_sShadowMap', sh.SamplerCmp, register = shadow_map_register)
 
-    def _sample_texture(texture_name : str):
-        texture_record = texture_dict.get(texture_name)
-        if texture_record is None:
+    def _sample_material_texture(texture_name : str):
+        material_texture = material_textures.get(texture_name)
+        if material_texture is None:
             return None
 
-        uv_set_idx = texture_record.gltf_texture.texCoord
+        uv_set_idx = material_texture.gltf_texture.texCoord
         if uv_set_idx is None:
             uv_set_idx = 0
 
@@ -291,7 +291,7 @@ def _generate_ps(ps_file, material, primitive):
         sh.fPerceptualRoughness = sh.g_perObjectPbrFactors.fRoughness
         sh.fMetallic = sh.g_perObjectPbrFactors.fMetallic
 
-        metallicRoughnessSample = _sample_texture('metallicRoughness')
+        metallicRoughnessSample = _sample_material_texture('metallicRoughness')
         if metallicRoughnessSample is not None:
             sh.fPerceptualRoughness *= metallicRoughnessSample.g
             sh.fMetallic *= metallicRoughnessSample.b
@@ -321,7 +321,7 @@ def _generate_ps(ps_file, material, primitive):
 
     with sh.function('F_Schlick', sh.RgbF)(LdotH = sh.Float, rgbF0 = sh.RgbF):
         sh.return_(
-            sh.rgbF0 + (sh.RgbF(1.0) - sh.rgbF0) \
+            sh.rgbF0 + (sh.RgbF(1.0) - sh.rgbF0)
                 * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
         )
 
@@ -431,7 +431,7 @@ def _generate_ps(ps_file, material, primitive):
         ) * sh.fLightAttenuation * sh.rgbLightColor * sh.fShadow )
 
     with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
-        normalSample = _sample_texture('normal')
+        normalSample = _sample_material_texture('normal')
         if (normalSample is not None
             and primitive.attributes.TANGENT is not None
         ):
@@ -457,12 +457,14 @@ def _generate_ps(ps_file, material, primitive):
         
         sh.psOut.rgbaColor.a = sh.pbrParams.fOpacity
 
-        aoSample = _sample_texture('occlusion')
+        aoSample = _sample_material_texture('occlusion')
         if aoSample is not None:
             sh.psOut.rgbaColor.rgb *= aoSample.x
 
-        sh.rgbEmissive = sh.g_perObjectPbrFactors.rgbaEmissive.rgb * sh.g_fPerFrameEmissiveFactor
-        emissiveSample = _sample_texture('emissive')
+        sh.rgbEmissive = ( sh.g_perObjectPbrFactors.rgbaEmissive.rgb
+            * sh.g_fPerFrameEmissiveFactor
+        )
+        emissiveSample = _sample_material_texture('emissive')
         if emissiveSample is not None:
             sh.rgbEmissive *= emissiveSample.rgb
         sh.psOut.rgbaColor.rgb += sh.rgbEmissive
