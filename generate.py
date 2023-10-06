@@ -486,7 +486,7 @@ def _generate_ps(ps_file, material, primitive):
             pbrParams = sh.pbrParams,
             N = sh.Nw,
             V = sh.Vw
-        )
+        ) * sh.g_fIblFactor
 
         aoSample = _sample_material_texture('occlusion')
         if aoSample is not None:
