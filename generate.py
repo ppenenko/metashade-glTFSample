@@ -430,7 +430,7 @@ def _generate_ps(ps_file, material, primitive):
             pbrParams = sh.pbrParams
         ) * sh.fLightAttenuation * sh.rgbLightColor * sh.fShadow )
 
-    with sh.function('get_ibl', sh.RgbF)(
+    with sh.function('getIbl', sh.RgbF)(
         pbrParams = sh.PbrParams,
         N = sh.Vector3f,
         V = sh.Vector3f
@@ -467,11 +467,13 @@ def _generate_ps(ps_file, material, primitive):
             print ('TODO: https://github.com/ppenenko/metashade/issues/19')
             sh.Nw = sh.psIn.Nw
         sh.Nw = sh.Nw.normalize()
-
         sh.Vw = (sh.g_cameraPw - sh.psIn.Pw).normalize()
-        sh.pbrParams = sh.metallicRoughness(psIn = sh.psIn)
         
+        sh.pbrParams = sh.metallicRoughness(psIn = sh.psIn)
+
         sh.psOut = sh.PsOut()
+        sh.psOut.rgbaColor.a = sh.pbrParams.fOpacity
+
         sh.psOut.rgbaColor.rgb = sh.applySpotLight(
             light = sh.g_light0,
             Pw = sh.psIn.Pw,
@@ -480,7 +482,11 @@ def _generate_ps(ps_file, material, primitive):
             pbrParams = sh.pbrParams
         )
         
-        sh.psOut.rgbaColor.a = sh.pbrParams.fOpacity
+        sh.psOut.rgbaColor.rgb += sh.getIbl(
+            pbrParams = sh.pbrParams,
+            N = sh.Nw,
+            V = sh.Vw
+        )
 
         aoSample = _sample_material_texture('occlusion')
         if aoSample is not None:
