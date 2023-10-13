@@ -385,6 +385,26 @@ def _generate_ps(ps_file, material, primitive):
             (sh.d / sh.light.fRange).lerp(sh.Float(1), sh.Float(0)).saturate()
         )
 
+    with sh.function('getFilteredShadow', sh.Float)(
+        uv = sh.Float2,
+        fCompareValue = sh.Float
+    ):
+        sh.fResult = sh.Float(0)
+        kernel_level = 2
+
+        for i in range(-kernel_level, kernel_level + 1):
+            for j in range(-kernel_level, kernel_level + 1):
+                sh.fResult += sh.g_sShadowMap(sh.g_tShadowMap)(
+                   tex_coord = sh.uv,
+                   offset = sh.Int2((i, j)),
+                   cmp_value = sh.fCompareValue,
+                   lod = 0
+                )
+
+        kernel_width = 2 * kernel_level + 1
+        sh.fResult /= kernel_width * kernel_width
+        sh.return_(sh.fResult)
+
     with sh.function('getSpotShadow', sh.Float)(
         light = sh.Light, Pw = sh.Point3f
     ):
@@ -396,10 +416,11 @@ def _generate_ps(ps_file, material, primitive):
         ) * sh.Float(0.5)
         sh.fCompareValue = sh.p4Shadow.z - sh.light.fDepthBias
         
-        sh.fShadowSample = sh.g_sShadowMap(sh.g_tShadowMap)(
-            sh.uvShadow, cmp_value = sh.fCompareValue, lod = 0
+        sh.fShadow = sh.getFilteredShadow(
+            uv = sh.uvShadow,
+            fCompareValue = sh.fCompareValue
         )
-        sh.return_(sh.fShadowSample)
+        sh.return_(sh.fShadow)
 
     with sh.function('applySpotLight', sh.RgbF)(
         light = sh.Light,
