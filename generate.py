@@ -483,17 +483,33 @@ def _generate_ps(ps_file, material, primitive):
         sh.return_(sh.rgbDiffuse + sh.rgbSpecular)
 
     with sh.function('getNormal', sh.Vector3f)(psIn = sh.VsOut):
+        sh.Nw = sh.psIn.Nw.normalize()
+
         normalSample = _sample_material_texture('normal')
-        if (normalSample is not None
-            and primitive.attributes.TANGENT is not None
-        ):
-            sh.tbn = sh.Matrix3x3f(rows = (sh.psIn.Tw, sh.psIn.Bw, sh.psIn.Nw))
-            sh.tbn = sh.tbn.transpose()
-            sh.Nw = sh.tbn.xform(2.0 * normalSample.xyz - sh.Vector3f(1.0))
-        else:
-            #sh.uvNormal = _get_material_uv('normal')
-            sh.Nw = sh.psIn.Nw
-        sh.Nw = sh.Nw.normalize()
+        if normalSample is not None:
+            if primitive.attributes.TANGENT is not None:
+                sh.tbn = sh.Matrix3x3f(
+                    rows = (sh.psIn.Tw, sh.psIn.Bw, sh.psIn.Nw)
+                )
+            else:
+                sh.PwDx = sh.psIn.Pw.ddx()
+                sh.PwDy = sh.psIn.Pw.ddy()
+
+                uv = _get_material_uv('normal')
+                sh.uvDx = uv.ddx()
+                sh.uvDy = uv.ddy()
+
+                sh.Tw = ( (sh.uvDy.y * sh.PwDx - sh.uvDx.y * sh.PwDy)
+                    / (sh.uvDx.x * sh.uvDy.y - sh.uvDy.x * sh.uvDx.y)
+                )
+                sh.Tw = (sh.Tw - sh.Nw * sh.Nw.dot(sh.Tw)).normalize()
+                sh.Bw = sh.Nw.cross(sh.Tw).normalize()
+                sh.tbn = sh.Matrix3x3f(rows = (sh.Tw, sh.Bw, sh.Nw))
+
+            sh.Nw = sh.tbn.transpose().xform(
+                2.0 * normalSample.xyz - sh.Vector3f(1.0)
+            ).normalize()
+
         sh.return_(sh.Nw)
 
     with sh.main(_ps_main, sh.PsOut)(psIn = sh.VsOut):
