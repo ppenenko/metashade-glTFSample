@@ -339,9 +339,10 @@ def _generate_ps(ps_file, material, primitive):
             (sh.NdotL - sh.NdotL * sh.fASqr) * sh.NdotL + sh.fASqr
         ).sqrt()
         sh.fGgxV = sh.NdotL * (
-            (sh.NdotV - sh.NdotV * sh.fASqr) + sh.NdotV + sh.fASqr
+            (sh.NdotV - sh.NdotV * sh.fASqr) * sh.NdotV + sh.fASqr
         ).sqrt()
-        sh.return_(sh.Float(0.5) / (sh.fGgxL + sh.fGgxV))
+        sh.fV = sh.Float(0.5) / (sh.fGgxL + sh.fGgxV)
+        sh.return_(sh.fV.saturate())
 
     with sh.function('Fd_Lambert', sh.Float)():
         sh.return_( sh.Float( 1.0 / math.pi ) )
