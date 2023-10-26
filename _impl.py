@@ -348,13 +348,13 @@ def generate_ps(ps_file, material, primitive):
     ):
         sh.H = (sh.V + sh.L).normalize()
 
-        sh.NdotV = sh.N.dot(sh.V).abs()
+        sh.NdotV = (sh.N @ sh.V).abs()
 
         for first, second in (('N', 'L'), ('N', 'H'), ('L', 'H')):
             setattr(
                 sh,
                 f'{first}dot{second}',
-                getattr(sh, first).dot(getattr(sh, second)).saturate()
+                (getattr(sh, first) @ getattr(sh, second)).saturate()
             )
 
         sh.fAlphaRoughness = sh.pbrParams.fPerceptualRoughness \
@@ -437,7 +437,7 @@ def generate_ps(ps_file, material, primitive):
         )
         sh.Lw = sh.Lw.normalize()
 
-        sh.DdotL = sh.light.v3DirectionW.dot(sh.Lw)
+        sh.DdotL = sh.light.v3DirectionW @ sh.Lw
         sh.fSpotAttenuation = sh.DdotL.smoothstep(
             sh.light.fOuterConeCos, sh.light.fInnerConeCos
         )
@@ -458,7 +458,7 @@ def generate_ps(ps_file, material, primitive):
         N = sh.Vector3f,
         V = sh.Vector3f
     ):
-        sh.NdotV = sh.N.dot(sh.V).saturate()
+        sh.NdotV = (sh.N @ sh.V).saturate()
         sh.fNumMips = sh.Float(9)
         sh.fLod = sh.pbrParams.fPerceptualRoughness * sh.fNumMips
         sh.R = (-sh.V).reflect(sh.N).normalize()
@@ -498,7 +498,7 @@ def generate_ps(ps_file, material, primitive):
                 sh.Tw = ( (sh.uvDy.y * sh.PwDx - sh.uvDx.y * sh.PwDy)
                     / (sh.uvDx.x * sh.uvDy.y - sh.uvDy.x * sh.uvDx.y)
                 )
-                sh.Tw = (sh.Tw - sh.Nw * sh.Nw.dot(sh.Tw)).normalize()
+                sh.Tw = (sh.Tw - sh.Nw * (sh.Nw @ sh.Tw)).normalize()
                 sh.Bw = sh.Nw.cross(sh.Tw).normalize()
                 sh.tbn = sh.Matrix3x3f(rows = (sh.Tw, sh.Bw, sh.Nw))
 
