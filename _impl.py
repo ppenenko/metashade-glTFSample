@@ -277,9 +277,11 @@ def generate_ps(ps_file, material, primitive):
     )
 
     with sh.function('metallicRoughness', sh.PbrParams)(psIn = sh.VsOut):
-        sh.rgbaBaseColor = ( sh.g_sBaseColor(sh.g_tBaseColor)(sh.psIn.uv0)
-            * sh.g_perObjectPbrFactors.rgbaBaseColor
+        sh.rgbaBaseColor = sh.g_sBaseColor(sh.g_tBaseColor)(
+            sh.psIn.uv0, lod_bias = sh.g_lodBias
         )
+        sh.rgbaBaseColor *= sh.g_perObjectPbrFactors.rgbaBaseColor
+        
         if hasattr(sh.psIn, 'rgbaColor0'):
             sh.rgbaBaseColor *= sh.psIn.rgbaColor0
 
