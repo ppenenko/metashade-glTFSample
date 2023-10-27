@@ -487,7 +487,11 @@ def generate_ps(ps_file, material, primitive):
         if normalSample is not None:
             if primitive.attributes.TANGENT is not None:
                 sh.tbn = sh.Matrix3x3f(
-                    rows = (sh.psIn.Tw, sh.psIn.Bw, sh.psIn.Nw)
+                    rows = (
+                        sh.psIn.Tw.normalize(),
+                        sh.psIn.Bw.normalize(),
+                        sh.Nw
+                    )
                 )
             else:
                 sh.PwDx = sh.psIn.Pw.ddx()
