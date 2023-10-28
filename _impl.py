@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import math
-from collections import namedtuple
+from typing import Any, NamedTuple
 from metashade.hlsl.sm6 import ps_6_0, vs_6_0
 
 def _generate_vs_out(sh, primitive):
@@ -169,9 +169,12 @@ def generate_ps(ps_file, material, primitive):
 
     with sh.ps_output('PsOut') as PsOut:
         PsOut.SV_Target('rgbaColor', sh.RgbaF)
+        
+    class _MaterialTexture(NamedTuple):
+        gltf_texture : Any
+        texel_type : Any
 
     material_textures = dict()
-    _MaterialTexture = namedtuple('_MaterialTexture', 'gltf_texture texel_type')
 
     def _def_material_texture(parent, name: str, texel_type = None):
         gltf_texture = getattr(parent, name + 'Texture')

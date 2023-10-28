@@ -14,7 +14,7 @@
 
 import argparse, io, os, pathlib, sys
 import multiprocessing as mp
-from collections import namedtuple
+from typing import Any, List, NamedTuple
 from pygltflib import GLTF2
 
 import metashade.hlsl.common as hlsl_common
@@ -62,7 +62,9 @@ class _PixelShader(_Shader):
     def _get_profile():
         return 'ps_6_0'
 
-_AssetResult = namedtuple('_AssetResult', 'log shaders')
+class _AssetResult(NamedTuple):
+    log : io.StringIO
+    shaders : List[Any]
 
 class _AssetProcessor:
     def __init__(self, out_dir):
