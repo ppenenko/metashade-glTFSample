@@ -228,20 +228,19 @@ def generate_ps(ps_file, material, primitive):
         )
 
     # IBL texture/sampler definitions
-    for ibl_texture_def in [
-        ('iblBrdfLut',  sh.Texture2d),
-        ('iblDiffuse',  sh.TextureCube(sh.RgbaF)),
-        ('iblSpecular', sh.TextureCube(sh.RgbaF))
-    ]:
+    for ibl_texture_name, ibl_texture_type in {
+        'iblBrdfLut'    : sh.Texture2d,
+        'iblDiffuse'    : sh.TextureCube(sh.RgbaF),
+        'iblSpecular'   : sh.TextureCube(sh.RgbaF)
+    }.items():
         texture_idx += 1    # continuing right after the material textures
-        texture_name = ibl_texture_def[0]
         sh.uniform(
-            _get_texture_uniform_name(texture_name),
-            ibl_texture_def[1],
+            _get_texture_uniform_name(ibl_texture_name),
+            ibl_texture_type,
             register = texture_idx
         )
         sh.uniform(
-            _get_sampler_uniform_name(texture_name),
+            _get_sampler_uniform_name(ibl_texture_name),
             sh.Sampler,
             register = texture_idx
         )
@@ -365,8 +364,9 @@ def generate_ps(ps_file, material, primitive):
         sh.NdotH = (sh.H @ sh.H).saturate()
         sh.LdotH = (sh.L @ sh.H).saturate()
 
-        sh.fAlphaRoughness = sh.pbrParams.fPerceptualRoughness \
+        sh.fAlphaRoughness = ( sh.pbrParams.fPerceptualRoughness
             * sh.pbrParams.fPerceptualRoughness
+        )
 
         sh.fD = sh.D_Ggx(
             NdotH = sh.NdotH,
