@@ -179,7 +179,9 @@ def generate_ps(ps_file, material, primitive):
     def _def_material_texture(parent, name: str, texel_type = None):
         gltf_texture = getattr(parent, name + 'Texture')
         if gltf_texture is not None:
-            material_textures[name] = _MaterialTexture(gltf_texture, texel_type)
+            material_textures[name] = _MaterialTexture(
+                gltf_texture, texel_type
+            )
 
     _def_material_texture(material, 'normal', sh.Vector4f)
     _def_material_texture(material, 'occlusion')
@@ -211,8 +213,8 @@ def generate_ps(ps_file, material, primitive):
     def _get_sampler_uniform_name(name: str) -> str:
         return 'g_s' + name[0].upper() + name[1:]
 
-    # The host app allocates texture and uniform registers for material textures
-    # sorted by name
+    # The host app allocates texture and uniform registers for material
+    # textures sorted by name
     for texture_idx, (texture_name, material_texture) in enumerate(
         sorted(material_textures.items())
     ):
@@ -472,14 +474,16 @@ def generate_ps(ps_file, material, primitive):
         sh.fLod = sh.pbrParams.fPerceptualRoughness * sh.fNumMips
         sh.R = (-sh.V).reflect(sh.N).normalize()
 
-        sh.f2brdfSamplePoint = sh.Float2(
+        sh.f2BrdfSamplePoint = sh.Float2(
             (sh.NdotV, sh.pbrParams.fPerceptualRoughness)
         ).saturate()
 
-        sh.f2Brdf = sh.g_sIblBrdfLut(sh.g_tIblBrdfLut)(sh.f2brdfSamplePoint).xy
+        sh.f2Brdf = sh.g_sIblBrdfLut(sh.g_tIblBrdfLut)(sh.f2BrdfSamplePoint).xy
 
         sh.rgbDiffuseLight = sh.g_sIblDiffuse(sh.g_tIblDiffuse)(sh.N).rgb
-        sh.rgbSpecularLight = sh.g_sIblSpecular(sh.g_tIblSpecular)(sh.R, lod = sh.fLod).rgb
+        sh.rgbSpecularLight = sh.g_sIblSpecular(sh.g_tIblSpecular)(
+            sh.R, lod = sh.fLod
+        ).rgb
 
         sh.rgbDiffuse = sh.rgbDiffuseLight * sh.pbrParams.rgbDiffuse
         sh.rgbSpecular = sh.rgbSpecularLight * (
