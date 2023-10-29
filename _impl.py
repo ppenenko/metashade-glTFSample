@@ -310,9 +310,10 @@ def generate_ps(ps_file, material, primitive):
         sh.fMinF0 = sh.Float(0.04)
 
         sh.pbrParams = sh.PbrParams()
-        sh.pbrParams.rgbDiffuse = sh.rgbaBaseColor.rgb \
-            * (sh.Float(1.0) - sh.fMinF0) \
+        sh.pbrParams.rgbDiffuse = (
+            sh.rgbaBaseColor.rgb * (sh.Float(1.0) - sh.fMinF0)
             * (sh.Float(1.0) - sh.fMetallic)
+        )
         sh.pbrParams.rgbF0 = sh.RgbF(sh.fMetallic).lerp(
             sh.RgbF(sh.fMinF0), sh.rgbaBaseColor.rgb
         )
