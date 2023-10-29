@@ -70,7 +70,6 @@ def _generate_per_frame_uniform_buffer(sh):
 
 def _generate_per_object_uniform_buffer(sh, is_ps : bool):
     if is_ps:
-        # https://github.com/ppenenko/Cauldron/blob/master/src/DX12/shaders/PBRPixelParams.hlsl#L33
         sh.struct('PbrFactors')(
             rgbaEmissive = sh.RgbaF,
 
@@ -169,7 +168,8 @@ def generate_ps(ps_file, material, primitive):
 
     with sh.ps_output('PsOut') as PsOut:
         PsOut.SV_Target('rgbaColor', sh.RgbaF)
-        
+
+    # Generating texture bindings
     class _MaterialTexture(NamedTuple):
         gltf_texture : Any
         texel_type : Any
@@ -211,7 +211,8 @@ def generate_ps(ps_file, material, primitive):
     def _get_sampler_uniform_name(name: str) -> str:
         return 'g_s' + name[0].upper() + name[1:]
 
-    # We're sorting material textures by name
+    # The host app allocates texture and uniform registers for material textures
+    # sorted by name
     for texture_idx, (texture_name, material_texture) in enumerate(
         sorted(material_textures.items())
     ):
@@ -226,12 +227,13 @@ def generate_ps(ps_file, material, primitive):
             register = texture_idx
         )
 
+    # IBL texture/sampler definitions
     for ibl_texture_def in [
         ('iblBrdfLut',  sh.Texture2d),
         ('iblDiffuse',  sh.TextureCube(sh.RgbaF)),
         ('iblSpecular', sh.TextureCube(sh.RgbaF))
     ]:
-        texture_idx += 1
+        texture_idx += 1    # continuing right after the material textures
         texture_name = ibl_texture_def[0]
         sh.uniform(
             _get_texture_uniform_name(texture_name),
@@ -244,6 +246,7 @@ def generate_ps(ps_file, material, primitive):
             register = texture_idx
         )
 
+    # The shadow map registers are hardcoded in the host app
     shadow_map_register = 9
     sh.uniform('g_tShadowMap', sh.Texture2d, register = shadow_map_register)
     sh.uniform('g_sShadowMap', sh.SamplerCmp, register = shadow_map_register)
@@ -392,13 +395,14 @@ def generate_ps(ps_file, material, primitive):
             (sh.d / sh.light.fRange).lerp(sh.Float(1), sh.Float(0)).saturate()
         )
 
-    with sh.function('getFilteredShadow', sh.Float)(
+    with sh.function('getPcfShadow', sh.Float)(
         uv = sh.Float2,
         fCompareValue = sh.Float
     ):
         sh.fResult = sh.Float(0)
         kernel_level = 2
 
+        # Unrolling the loop right here in Metashade
         for i in range(-kernel_level, kernel_level + 1):
             for j in range(-kernel_level, kernel_level + 1):
                 sh.fResult += sh.g_sShadowMap(sh.g_tShadowMap)(
@@ -423,7 +427,7 @@ def generate_ps(ps_file, material, primitive):
         ) * sh.Float(0.5)
         sh.fCompareValue = sh.p4Shadow.z - sh.light.fDepthBias
         
-        sh.fShadow = sh.getFilteredShadow(
+        sh.fShadow = sh.getPcfShadow(
             uv = sh.uvShadow,
             fCompareValue = sh.fCompareValue
         )
@@ -517,6 +521,7 @@ def generate_ps(ps_file, material, primitive):
 
         sh.return_(sh.Nw)
 
+    # Finally, the pixel shader entry point
     with sh.main(ps_main, sh.PsOut)(psIn = sh.VsOut):
         sh.Vw = (sh.g_cameraPw - sh.psIn.Pw).normalize()
         sh.Nw = sh.getNormal(psIn = sh.psIn)
