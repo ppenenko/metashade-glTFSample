@@ -319,6 +319,8 @@ def generate_ps(ps_file, material, primitive):
         sh.pbrParams.fOpacity = sh.rgbaBaseColor.a
         sh.return_(sh.pbrParams)
 
+    sh // "https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)"
+    sh // ""
     with sh.function('D_Ggx', sh.Float)(
         NdotH = sh.Float, fAlphaRoughness = sh.Float
     ):
@@ -334,6 +336,8 @@ def generate_ps(ps_file, material, primitive):
                 * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
         )
 
+    sh // "https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)"
+    sh // ""
     with sh.function('V_SmithGgxCorrelated', sh.Float)(
         NdotV = sh.Float, NdotL = sh.Float, fAlphaRoughness = sh.Float
     ):
