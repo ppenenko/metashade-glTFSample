@@ -358,16 +358,12 @@ def generate_ps(ps_file, material, primitive):
         L = sh.Vector3f, N = sh.Vector3f, V = sh.Vector3f,
         pbrParams = sh.PbrParams
     ):
-        sh.H = (sh.V + sh.L).normalize()
-
         sh.NdotV = (sh.N @ sh.V).abs()
+        sh.NdotL = (sh.N @ sh.L).saturate()
 
-        for first, second in (('N', 'L'), ('N', 'H'), ('L', 'H')):
-            setattr(
-                sh,
-                f'{first}dot{second}',
-                (getattr(sh, first) @ getattr(sh, second)).saturate()
-            )
+        sh.H = (sh.V + sh.L).normalize()
+        sh.NdotH = (sh.H @ sh.H).saturate()
+        sh.LdotH = (sh.L @ sh.H).saturate()
 
         sh.fAlphaRoughness = sh.pbrParams.fPerceptualRoughness \
             * sh.pbrParams.fPerceptualRoughness
