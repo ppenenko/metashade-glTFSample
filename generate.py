@@ -145,6 +145,8 @@ if __name__ == "__main__":
             shaders += asset_result.shaders
 
     if args.compile:
+        print()
+        hlsl_common.identify_dxc()
         with mp.Pool() as pool:
             for compilation_log in pool.imap_unordered(
                 functools.partial(
@@ -153,4 +155,4 @@ if __name__ == "__main__":
                 ),
                 shaders
             ):
-                print(compilation_log)
+                print(compilation_log, end = '')
