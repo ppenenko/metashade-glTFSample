@@ -18,7 +18,7 @@ from typing import List, NamedTuple
 from pygltflib import GLTF2
 
 import metashade.hlsl.common as hlsl_common
-import metashade.util as util
+from metashade.util import perf, spirv_cross
 
 import _impl
 
@@ -34,16 +34,22 @@ class _Shader:
     def _get_profile():
         return None
 
-    def compile(self, to_spirv : bool) -> str:
+    def compile(self, to_glsl : bool) -> str:
         log = io.StringIO()
         sys.stdout = log
-        hlsl_common.compile(
+        
+        compilation_result = hlsl_common.compile(
             src_path = self._file_path,
             entry_point_name = self._get_entry_point_name(),
             profile = self._get_profile(),
-            to_spirv = to_spirv,
+            to_spirv = to_glsl,
             output_to_file = True
         )
+
+        if to_glsl:
+            spirv_cross.spirv_to_glsl(
+                spirv_path = compilation_result.out_path
+            )
         return log.getvalue()
 
 class _VertexShader(_Shader):
@@ -75,7 +81,7 @@ def _process_asset(
     shaders = []
     sys.stdout = io.StringIO()
     
-    with util.TimedScope(f'Loading glTF asset {gltf_file_path} '):
+    with perf.TimedScope(f'Loading glTF asset {gltf_file_path} '):
         gltf_asset = GLTF2().load(gltf_file_path)
 
     for mesh_idx, mesh in enumerate(gltf_asset.meshes):
@@ -91,14 +97,14 @@ def _process_asset(
                 )
             
             file_path = _get_file_path('VS')
-            with util.TimedScope(f'Generating {file_path} ', 'Done'), \
+            with perf.TimedScope(f'Generating {file_path} ', 'Done'), \
                 open(file_path, 'w') as vs_file:
                 #
                 _impl.generate_vs(vs_file, primitive)
             shaders.append(_VertexShader(file_path))
 
             file_path = _get_file_path('PS')
-            with util.TimedScope(f'Generating {file_path} ', 'Done'), \
+            with perf.TimedScope(f'Generating {file_path} ', 'Done'), \
                 open(file_path, 'w') as ps_file:
                 #
                 _impl.generate_ps(
@@ -121,9 +127,9 @@ if __name__ == "__main__":
         help = "Compile the generated shaders with DXC (has to be in PATH)"
     )
     parser.add_argument(
-        "--spirv",
+        "--to-glsl",
         action = 'store_true',
-        help = "Compile to SPIR-V"
+        help = "Cross-compile to GLSL with SPIRV-Cross"
     )
     args = parser.parse_args()
     
@@ -147,11 +153,14 @@ if __name__ == "__main__":
     if args.compile:
         print()
         hlsl_common.identify_dxc()
+        if args.to_glsl:
+            spirv_cross.identify()
+
         with mp.Pool() as pool:
             for compilation_log in pool.imap_unordered(
                 functools.partial(
                     _Shader.compile,
-                    to_spirv = args.spirv
+                    to_glsl = args.to_glsl
                 ),
                 shaders
             ):
