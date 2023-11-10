@@ -38,10 +38,11 @@ class _Shader:
         log = io.StringIO()
         sys.stdout = log
         hlsl_common.compile(
-            path = self._file_path,
+            src_path = self._file_path,
             entry_point_name = self._get_entry_point_name(),
             profile = self._get_profile(),
-            spirv = to_spirv
+            to_spirv = to_spirv,
+            output_to_file = True
         )
         return log.getvalue()
 
