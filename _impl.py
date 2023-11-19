@@ -329,7 +329,7 @@ def generate_ps(ps_file, material, primitive):
         sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
         sh.fF = (sh.NdotH * sh.fASqr - sh.NdotH) * sh.NdotH + sh.Float(1.0)
         sh.return_(
-            sh.fASqr / (sh.Float(math.pi) * sh.fF * sh.fF )
+            (sh.fASqr / (sh.Float(math.pi) * sh.fF * sh.fF )).saturate()
         )
 
     with sh.function('F_Schlick', sh.RgbF)(LdotH = sh.Float, rgbF0 = sh.RgbF):
@@ -364,7 +364,7 @@ def generate_ps(ps_file, material, primitive):
         sh.NdotL = (sh.N @ sh.L).saturate()
 
         sh.H = (sh.V + sh.L).normalize()
-        sh.NdotH = (sh.H @ sh.H).saturate()
+        sh.NdotH = (sh.N @ sh.H).saturate()
         sh.LdotH = (sh.L @ sh.H).saturate()
 
         sh.fAlphaRoughness = ( sh.pbrParams.fPerceptualRoughness
