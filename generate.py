@@ -17,7 +17,7 @@ import multiprocessing as mp
 from typing import List, NamedTuple
 from pygltflib import GLTF2
 
-import metashade.hlsl.common as hlsl_common
+from metashade.hlsl import dxc
 from metashade.util import perf, spirv_cross
 
 import _impl
@@ -38,7 +38,7 @@ class _Shader:
         log = io.StringIO()
         sys.stdout = log
         
-        compilation_result = hlsl_common.compile(
+        compilation_result = dxc.compile(
             src_path = self._file_path,
             entry_point_name = self._get_entry_point_name(),
             profile = self._get_profile(),
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
     if args.compile:
         print()
-        hlsl_common.identify_dxc()
+        dxc.identify()
         if args.to_glsl:
             spirv_cross.identify()
 
