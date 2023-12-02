@@ -12,44 +12,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse, functools, io, os, pathlib, sys
+import abc, argparse, functools, io, os, pathlib, subprocess, sys
 import multiprocessing as mp
 from typing import List, NamedTuple
 from pygltflib import GLTF2
 
 from metashade.hlsl import dxc
 from metashade.util import perf, spirv_cross
+from metashade.glsl import glslc
 
 import _impl
 
-class _Shader:
+class _Shader(abc.ABC):
     def __init__(self, file_path):
         self._file_path = file_path
 
-    @staticmethod
+    @abc.abstractclassmethod
     def _get_entry_point_name():
-        return None
+        pass
     
-    @staticmethod
-    def _get_profile():
-        return None
+    @abc.abstractclassmethod
+    def _get_hlsl_profile():
+        pass
+    
+    @abc.abstractclassmethod
+    def _get_glsl_stage():
+        pass
 
     def compile(self, to_glsl : bool) -> str:
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
-        
-        compilation_result = dxc.compile(
-            src_path = self._file_path,
-            entry_point_name = self._get_entry_point_name(),
-            profile = self._get_profile(),
-            to_spirv = to_glsl,
-            output_to_file = True
-        )
 
-        if to_glsl:
-            spirv_cross.spirv_to_glsl(
-                spirv_path = compilation_result.out_path
+        try:
+            dxc_output_path = pathlib.Path(self._file_path).with_suffix(
+                '.hlsl.spv' if to_glsl else '.cso'
             )
+            
+            dxc.compile(
+                src_path = self._file_path,
+                entry_point_name = self._get_entry_point_name(),
+                profile = self._get_hlsl_profile(),
+                to_spirv = to_glsl,
+                output_path = dxc_output_path
+            )
+
+            if to_glsl:
+                glsl_path = pathlib.Path(self._file_path).with_suffix('.glsl')
+                spirv_cross.spirv_to_glsl(
+                    spirv_path = dxc_output_path,
+                    glsl_path = glsl_path
+                )
+                spv_path = pathlib.Path(self._file_path).with_suffix('.spv')
+                glslc.compile(
+                    src_path = glsl_path,
+                    target_env = 'vulkan1.1',
+                    shader_stage = self._get_glsl_stage(),
+                    entry_point_name = self._get_entry_point_name(),
+                    output_path = spv_path
+                )
+        except subprocess.CalledProcessError as err:
+            pass
+            
 
         log, sys.stdout = sys.stdout, log
         return log.getvalue()
@@ -60,17 +83,25 @@ class _VertexShader(_Shader):
         return _impl.vs_main
     
     @staticmethod
-    def _get_profile():
+    def _get_hlsl_profile():
         return 'vs_6_0'
     
+    @staticmethod
+    def _get_glsl_stage():
+        return 'vertex'
+
 class _PixelShader(_Shader):
     @staticmethod
     def _get_entry_point_name():
         return _impl.ps_main
     
     @staticmethod
-    def _get_profile():
+    def _get_hlsl_profile():
         return 'ps_6_0'
+    
+    @staticmethod
+    def _get_glsl_stage():
+        return 'fragment'
 
 class _AssetResult(NamedTuple):
     log : io.StringIO
@@ -186,6 +217,7 @@ if __name__ == "__main__":
         dxc.identify()
         if args.to_glsl:
             spirv_cross.identify()
+            glslc.identify()
 
         if args.serial:
             for shader in shaders:
