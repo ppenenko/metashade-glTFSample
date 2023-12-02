@@ -63,11 +63,15 @@ class _Shader(abc.ABC):
                     glsl_path = glsl_path
                 )
                 spv_path = pathlib.Path(self._file_path).with_suffix('.spv')
+
+                # this is the default produced by SPIRV-Cross
+                glsl_entry_point_name = 'main'
+
                 glslc.compile(
                     src_path = glsl_path,
                     target_env = 'vulkan1.1',
                     shader_stage = self._get_glsl_stage(),
-                    entry_point_name = self._get_entry_point_name(),
+                    entry_point_name = glsl_entry_point_name,
                     output_path = spv_path
                 )
         except subprocess.CalledProcessError as err:
