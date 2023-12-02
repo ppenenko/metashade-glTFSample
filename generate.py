@@ -76,7 +76,8 @@ class _AssetResult(NamedTuple):
 
 def _process_asset(
         gltf_file_path : str,
-        out_dir : str
+        out_dir : str,
+        skip_codegen : bool = False
 ) -> _AssetResult:
     shaders = []
     sys.stdout = io.StringIO()
@@ -97,21 +98,23 @@ def _process_asset(
                 )
             
             file_path = _get_file_path('VS')
-            with perf.TimedScope(f'Generating {file_path} ', 'Done'), \
-                open(file_path, 'w') as vs_file:
-                #
-                _impl.generate_vs(vs_file, primitive)
+            if not skip_codegen:
+                with perf.TimedScope(f'Generating {file_path} ', 'Done'), \
+                    open(file_path, 'w') as vs_file:
+                    #
+                    _impl.generate_vs(vs_file, primitive)
             shaders.append(_VertexShader(file_path))
 
             file_path = _get_file_path('PS')
-            with perf.TimedScope(f'Generating {file_path} ', 'Done'), \
-                open(file_path, 'w') as ps_file:
-                #
-                _impl.generate_ps(
-                    ps_file,
-                    gltf_asset.materials[primitive.material],
-                    primitive
-                )
+            if not skip_codegen:
+                with perf.TimedScope(f'Generating {file_path} ', 'Done'), \
+                    open(file_path, 'w') as ps_file:
+                    #
+                    _impl.generate_ps(
+                        ps_file,
+                        gltf_asset.materials[primitive.material],
+                        primitive
+                    )
             shaders.append(_PixelShader(file_path))
     return _AssetResult(sys.stdout.getvalue(), shaders)
 
@@ -131,6 +134,12 @@ if __name__ == "__main__":
         action = 'store_true',
         help = "Cross-compile to GLSL with SPIRV-Cross"
     )
+    parser.add_argument(
+        "--skip-codegen",
+        action = 'store_true',
+        help = "Assume that sources have been generated and proceed to "
+               "compilation."
+    )
     args = parser.parse_args()
     
     if not os.path.isdir(args.gltf_dir):
@@ -143,7 +152,8 @@ if __name__ == "__main__":
         for asset_result in pool.imap_unordered(
             functools.partial(
                 _process_asset,
-                out_dir = args.out_dir
+                out_dir = args.out_dir,
+                skip_codegen = args.skip_codegen
             ),
             pathlib.Path(args.gltf_dir).glob('**/*.gltf')
         ):
