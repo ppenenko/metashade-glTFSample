@@ -271,7 +271,7 @@ def generate_ps(ps_file, material, primitive):
         texture = getattr(sh, _get_texture_uniform_name(texture_name))
         sampler = getattr(sh, _get_sampler_uniform_name(texture_name))
 
-        sample = sampler(texture)(uv, lod_bias = sh.g_lodBias)
+        sample = (sampler @ texture)(uv, lod_bias = sh.g_lodBias)
         sample_var_name = texture_name + 'Sample'
         setattr(sh, sample_var_name, sample)
         return getattr(sh, sample_var_name)
@@ -284,7 +284,7 @@ def generate_ps(ps_file, material, primitive):
     )
 
     with sh.function('metallicRoughness', sh.PbrParams)(psIn = sh.VsOut):
-        sh.rgbaBaseColor = sh.g_sBaseColor(sh.g_tBaseColor)(
+        sh.rgbaBaseColor = (sh.g_sBaseColor @ sh.g_tBaseColor)(
             sh.psIn.uv0, lod_bias = sh.g_lodBias
         )
         sh.rgbaBaseColor *= sh.g_perObjectPbrFactors.rgbaBaseColor
@@ -408,7 +408,7 @@ def generate_ps(ps_file, material, primitive):
         # Unrolling the loop right here in Metashade
         for i in range(-kernel_level, kernel_level + 1):
             for j in range(-kernel_level, kernel_level + 1):
-                sh.fResult += sh.g_sShadowMap(sh.g_tShadowMap)(
+                sh.fResult += (sh.g_sShadowMap @ sh.g_tShadowMap)(
                    tex_coord = sh.uv,
                    offset = sh.Int2((i, j)),
                    cmp_value = sh.fCompareValue,
@@ -479,10 +479,10 @@ def generate_ps(ps_file, material, primitive):
             (sh.NdotV, sh.pbrParams.fPerceptualRoughness)
         ).saturate()
 
-        sh.f2Brdf = sh.g_sIblBrdfLut(sh.g_tIblBrdfLut)(sh.f2BrdfSamplePoint).xy
+        sh.f2Brdf = (sh.g_sIblBrdfLut @ sh.g_tIblBrdfLut)(sh.f2BrdfSamplePoint).xy
 
-        sh.rgbDiffuseLight = sh.g_sIblDiffuse(sh.g_tIblDiffuse)(sh.N).rgb
-        sh.rgbSpecularLight = sh.g_sIblSpecular(sh.g_tIblSpecular)(
+        sh.rgbDiffuseLight = (sh.g_sIblDiffuse @ sh.g_tIblDiffuse)(sh.N).rgb
+        sh.rgbSpecularLight = (sh.g_sIblSpecular @ sh.g_tIblSpecular)(
             sh.R, lod = sh.fLod
         ).rgb
 
