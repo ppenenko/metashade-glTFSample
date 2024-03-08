@@ -264,16 +264,27 @@ def generate_ps(ps_file, material, primitive):
         return getattr(sh.psIn, f'uv{uv_set_idx}')
 
     def _sample_material_texture(texture_name : str):
+        # Get the UV member of the input structure
+        # corresponding to the glTF texture
         uv = _get_material_uv(texture_name)
         if uv is None:
+            # The texture is not used in the material
             return None
 
+        # Get the texture and sampler uniforms by the glTF texture name
         texture = getattr(sh, _get_texture_uniform_name(texture_name))
         sampler = getattr(sh, _get_sampler_uniform_name(texture_name))
 
+        # Generate the expression sampling the texture
         sample = (sampler @ texture)(uv, lod_bias = sh.g_lodBias)
+
+        # Create a unique variable name for the sample
         sample_var_name = texture_name + 'Sample'
+
+        # Initialize a local sample variable with the expression
         setattr(sh, sample_var_name, sample)
+
+        # Return a reference to the local variable
         return getattr(sh, sample_var_name)
 
     sh.struct('PbrParams')(
