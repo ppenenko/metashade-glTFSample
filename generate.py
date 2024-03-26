@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import abc, argparse, functools, io, os, pathlib, subprocess, sys
+import abc, argparse, functools, io, os, subprocess, sys
+from pathlib import Path
 import multiprocessing as mp
 from typing import List, NamedTuple
 from pygltflib import GLTF2
@@ -44,7 +45,7 @@ class _Shader(abc.ABC):
         log, sys.stdout = sys.stdout, log
 
         try:
-            dxc_output_path = pathlib.Path(self._file_path).with_suffix(
+            dxc_output_path = Path(self._file_path).with_suffix(
                 '.hlsl.spv' if to_glsl else '.cso'
             )
             
@@ -57,12 +58,12 @@ class _Shader(abc.ABC):
             )
 
             if to_glsl:
-                glsl_path = pathlib.Path(self._file_path).with_suffix('.glsl')
+                glsl_path = Path(self._file_path).with_suffix('.glsl')
                 spirv_cross.spirv_to_glsl(
                     spirv_path = dxc_output_path,
                     glsl_path = glsl_path
                 )
-                spv_path = pathlib.Path(self._file_path).with_suffix('.spv')
+                spv_path = Path(self._file_path).with_suffix('.spv')
 
                 # this is the default produced by SPIRV-Cross
                 glsl_entry_point_name = 'main'
@@ -131,9 +132,8 @@ def _process_asset(
 
         for primitive_idx, primitive in enumerate(mesh.primitives):
             def _get_file_path(stage : str):
-                return os.path.join(
-                    out_dir,
-                    f'{mesh_name}-{primitive_idx}-{stage}.hlsl'
+                return (
+                    Path(out_dir) / f'{mesh_name}-{primitive_idx}-{stage}.hlsl'
                 )
             
             file_path = _get_file_path('VS')
@@ -187,15 +187,16 @@ if __name__ == "__main__":
         help = "Disable parallelization to facilitate debugging."
     )
     args = parser.parse_args()
-    
-    if not os.path.isdir(args.gltf_dir):
-        raise NotADirectoryError(args.gltf_dir)
+
+    gltf_dir_path = Path(args.gltf_dir)
+    if not gltf_dir_path.is_dir():
+        raise NotADirectoryError(gltf_dir_path)
     
     os.makedirs(args.out_dir, exist_ok = True)
 
     shaders = []
     if args.serial:
-        for gltf_path in pathlib.Path(args.gltf_dir).glob('**/*.gltf'):
+        for gltf_path in gltf_dir_path.glob('**/*.gltf'):
             asset_result = _process_asset(
                 gltf_file_path = gltf_path,
                 out_dir = args.out_dir,
@@ -211,7 +212,7 @@ if __name__ == "__main__":
                     out_dir = args.out_dir,
                     skip_codegen = args.skip_codegen
                 ),
-                pathlib.Path(args.gltf_dir).glob('**/*.gltf')
+                gltf_dir_path.glob('**/*.gltf')
             ):
                 print(asset_result.log)
                 shaders += asset_result.shaders
