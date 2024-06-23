@@ -4,3 +4,4 @@
 [submodule "glTFSample"]
 	path = glTFSample
 	url = https://github.com/ppenenko/glTFSample.git
+	branch = metashade_demo
