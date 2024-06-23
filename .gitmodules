@@ -1,0 +1,3 @@
+[submodule "metashade"]
+	path = metashade
+	url = https://github.com/ppenenko/metashade.git
