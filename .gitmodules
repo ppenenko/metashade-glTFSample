@@ -1,3 +1,6 @@
 [submodule "metashade"]
 	path = metashade
 	url = https://github.com/ppenenko/metashade.git
+[submodule "glTFSample"]
+	path = glTFSample
+	url = https://github.com/ppenenko/glTFSample.git
