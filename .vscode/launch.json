@@ -28,7 +28,10 @@
                 "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
                 "--out-dir", "${workspaceFolder}/../metashade-out",
                 "--compile"
-            ]
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/metashade"
+            }
         },
         {
             "name": "Cross-compile to GLSL",
@@ -42,7 +45,10 @@
                 "--skip-codegen",
                 "--compile",
                 "--to-glsl"
-            ]
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/metashade"
+            }
         },
         {
             "name": "Usage",
@@ -50,7 +56,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
-            "args": ["--help"]
+            "args": ["--help"],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/metashade"
+            }
         }
     ]
 }
