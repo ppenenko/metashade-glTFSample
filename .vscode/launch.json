@@ -1,0 +1,65 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Generate",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/generate.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
+                "--out-dir", "${workspaceFolder}/../metashade-out"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/metashade"
+            }
+        },
+        {
+            "name": "Generate and compile",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/generate.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
+                "--out-dir", "${workspaceFolder}/../metashade-out",
+                "--compile"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/metashade"
+            }
+        },
+        {
+            "name": "Cross-compile to GLSL",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/generate.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
+                "--out-dir", "${workspaceFolder}/../metashade-out",
+                "--skip-codegen",
+                "--compile",
+                "--to-glsl"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/metashade"
+            }
+        },
+        {
+            "name": "Usage",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/generate.py",
+            "console": "integratedTerminal",
+            "args": ["--help"],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/metashade"
+            }
+        }
+    ]
+}
