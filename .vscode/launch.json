@@ -8,18 +8,21 @@
             "name": "glTF generate",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/gltfdemo/generate.py",
+            "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": [
                 "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
                 "--out-dir", "${workspaceFolder}/../metashade-out"
-            ]
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/metashade"
+            }
         },
         {
             "name": "glTF generate and compile",
             "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/gltfdemo/generate.py",
+            "request": "launch",            
+            "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": [
                 "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
@@ -31,7 +34,7 @@
             "name": "glTF cross-compile to GLSL",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/gltfdemo/generate.py",
+            "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": [
                 "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
@@ -45,7 +48,7 @@
             "name": "glTF usage",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/gltfdemo/generate.py",
+            "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": ["--help"]
         },
