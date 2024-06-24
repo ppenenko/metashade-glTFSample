@@ -5,8 +5,8 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "glTF generate",
-            "type": "python",
+            "name": "Generate",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
@@ -19,9 +19,9 @@
             }
         },
         {
-            "name": "glTF generate and compile",
-            "type": "python",
-            "request": "launch",            
+            "name": "Generate and compile",
+            "type": "debugpy",
+            "request": "launch",
             "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": [
@@ -31,8 +31,8 @@
             ]
         },
         {
-            "name": "glTF cross-compile to GLSL",
-            "type": "python",
+            "name": "Cross-compile to GLSL",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
@@ -45,19 +45,12 @@
             ]
         },
         {
-            "name": "glTF usage",
-            "type": "python",
+            "name": "Usage",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": ["--help"]
-        },
-        {
-            "name": "Python: Test debug config",
-            "type": "python",
-            "request": "test",
-            "console": "integratedTerminal",
-            "logToFile": true
         }
     ]
 }
