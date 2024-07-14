@@ -17,7 +17,7 @@ This will create the following top-level directory structure:
       * [build](https://github.com/ppenenko/glTFSample/tree/metashade_demo/build) - the build directory for the above repo.
          * [DX12](https://github.com/ppenenko/glTFSample/tree/metashade_demo/build/DX12) - this directory will be created by a build script and will contain the DX12-specific Visual Studio solution generated with CMake. It's added to [.gitignore](https://github.com/ppenenko/glTFSample/tree/metashade_demo/.gitignore)
       * [libs/cauldron](https://github.com/ppenenko/Cauldron/tree/metashade_demo) - submodule pointing at https://github.com/ppenenko/Cauldron/tree/metashade_demo, a fork of https://github.com/GPUOpen-LibrariesAndSDKs/Cauldron, AMD's demo rendering framework.
-      * [media/Cauldron-Media](glTFSample/media/Cauldron-Media) - submodule pointing at https://github.com/ppenenko/Cauldron-Media, cloned from https://github.com/GPUOpen-LibrariesAndSDKs/Cauldron-Media, which contains the glTF assets used in the demo.
+      * [media/Cauldron-Media](https://github.com/ppenenko/Cauldron-Media) - submodule pointing at https://github.com/ppenenko/Cauldron-Media, cloned from https://github.com/GPUOpen-LibrariesAndSDKs/Cauldron-Media, which contains the glTF assets used in the demo.
    * [metashade](https://github.com/ppenenko/metashade) - submodule pointing at https://github.com/ppenenko/metashade
    * [src](src) - the code generating shaders with [metashade](https://github.com/ppenenko/metashade) for rendering with [glTFSample](https://github.com/ppenenko/glTFSample/tree/metashade_demo).
 
