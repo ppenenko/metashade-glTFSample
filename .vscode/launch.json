@@ -11,8 +11,8 @@
             "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": [
-                "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
-                "--out-dir", "${workspaceFolder}/../metashade-out"
+                "--gltf-dir", "${workspaceFolder}/glTFSample/media/Cauldron-Media",
+                "--out-dir", "${workspaceFolder}/glTFSample/build/DX12/metashade-out"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/metashade"
@@ -25,8 +25,8 @@
             "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": [
-                "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
-                "--out-dir", "${workspaceFolder}/../metashade-out",
+                "--gltf-dir", "${workspaceFolder}/glTFSample/media/Cauldron-Media",
+                "--out-dir", "${workspaceFolder}/glTFSample/build/DX12/metashade-out",
                 "--compile"
             ],
             "env": {
@@ -40,8 +40,8 @@
             "program": "${workspaceFolder}/src/generate.py",
             "console": "integratedTerminal",
             "args": [
-                "--gltf-dir", "${workspaceFolder}/../glTFSample/media/Cauldron-Media",
-                "--out-dir", "${workspaceFolder}/../metashade-out",
+                "--gltf-dir", "${workspaceFolder}/glTFSample/media/Cauldron-Media",
+                "--out-dir", "${workspaceFolder}/glTFSample/build/DX12/metashade-out",
                 "--skip-codegen",
                 "--compile",
                 "--to-glsl"
