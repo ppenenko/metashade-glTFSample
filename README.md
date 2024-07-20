@@ -1,4 +1,4 @@
-# glTF Demo
+# Metashade glTF Demo
 
 This demo uses the third-party [pygltflib](https://pypi.org/project/pygltflib/) to parse glTF assets and generate HLSL shaders that can be rendered with [a fork of the Cauldron glTFSample](https://github.com/ppenenko/glTFSample/tree/metashade_demo).
 The goal is to demonstrate that [Metashade](https://github.com/ppenenko/metashade) can generate sufficiently complex renderable shaders and that it can be integrated with other Python libraries and content production pipelines.
