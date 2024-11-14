@@ -28,7 +28,7 @@ Follow the build instructions in [glTFSample/readme.md](https://github.com/ppene
 
 ## Generating the shaders
 
-The Python implementation of the demo requires the [pygltflib](https://pypi.org/project/pygltflib/) to be installed:
+The Python implementation of the demo requires [pygltflib](https://pypi.org/project/pygltflib/) to be installed:
 
 ```
 pip install pygltflib
