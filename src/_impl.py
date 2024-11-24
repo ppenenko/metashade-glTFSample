@@ -134,7 +134,7 @@ def generate_vs(vs_file, primitive):
 
     _generate_vs_out(sh, primitive)
 
-    with sh.main(vs_main, sh.VsOut)(vsIn = sh.VsIn):
+    with sh.entry_point(vs_main, sh.VsOut)(vsIn = sh.VsIn):
         sh.Pw = sh.g_WorldXf.xform(sh.vsIn.Pobj)
         sh.vsOut = sh.VsOut()
         sh.vsOut.Pclip = sh.g_VpXf.xform(sh.Pw)
@@ -537,7 +537,7 @@ def generate_ps(ps_file, material, primitive):
         sh.return_(sh.Nw)
 
     # Finally, the pixel shader entry point
-    with sh.main(ps_main, sh.PsOut)(psIn = sh.VsOut):
+    with sh.entry_point(ps_main, sh.PsOut)(psIn = sh.VsOut):
         sh.Vw = (sh.g_cameraPw - sh.psIn.Pw).normalize()
         sh.Nw = sh.getNormal(psIn = sh.psIn)
         
