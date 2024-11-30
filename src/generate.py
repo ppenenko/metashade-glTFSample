@@ -18,9 +18,9 @@ import multiprocessing as mp
 from typing import List, NamedTuple
 from pygltflib import GLTF2
 
-from metashade.hlsl import dxc
+from metashade.hlsl.util import dxc
 from metashade.util import perf, spirv_cross
-from metashade.glsl import glslc
+from metashade.glsl.util import glslc
 
 import _impl
 
