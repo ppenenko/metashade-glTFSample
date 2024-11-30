@@ -56,6 +56,18 @@ class _Shader(abc.ABC):
             #
             self._generate(shader_file, material, primitive)
 
+    @abc.abstractmethod
+    def compile(self, to_glsl : bool) -> str:
+        pass
+
+def _compile_shader(shader, to_glsl):
+    '''
+    Helper function to compile a shader in a process pool.
+    Without it, the pool would not be able to pickle the method.
+    '''
+    return shader.compile(to_glsl)
+
+class _HlslShader(_Shader):
     def compile(self, to_glsl : bool) -> str:
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
@@ -93,12 +105,11 @@ class _Shader(abc.ABC):
                 )
         except subprocess.CalledProcessError as err:
             pass
-            
 
         log, sys.stdout = sys.stdout, log
         return log.getvalue()
 
-class _VertexShader(_Shader):
+class _HlslVertexShader(_HlslShader):
     def __init__(
         self,
         out_dir : Path,
@@ -122,7 +133,7 @@ class _VertexShader(_Shader):
     def _generate(self, shader_file, material, primitive):
         _impl.generate_vs(shader_file, primitive)
 
-class _PixelShader(_Shader):
+class _HlslPixelShader(_HlslShader):
     def __init__(
         self,
         out_dir : Path,
@@ -150,7 +161,6 @@ class _PixelShader(_Shader):
             primitive
         )
 
-
 class _AssetResult(NamedTuple):
     log : io.StringIO
     shaders : List[_Shader]
@@ -175,8 +185,8 @@ def _process_asset(
 
         for primitive_idx, primitive in enumerate(mesh.primitives):
             per_primitive_shaders = [
-                _VertexShader(out_dir, mesh_name, primitive_idx),
-                _PixelShader(out_dir, mesh_name, primitive_idx)
+                _HlslVertexShader(out_dir, mesh_name, primitive_idx),
+                _HlslPixelShader(out_dir, mesh_name, primitive_idx)
             ]
             
             if not skip_codegen:
@@ -265,7 +275,7 @@ if __name__ == "__main__":
             with mp.Pool() as pool:
                 for log in pool.imap_unordered(
                     functools.partial(
-                        _Shader.compile,
+                        _compile_shader,
                         to_glsl = args.to_glsl
                     ),
                     shaders
