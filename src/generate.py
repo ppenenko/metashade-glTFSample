@@ -32,16 +32,10 @@ class _Shader(abc.ABC):
         primitive_idx : int,
         file_suffix : str
     ):
-        self._file_path = out_dir / f'{mesh_name}-{primitive_idx}-{file_suffix}'
+        self._file_path = (
+            out_dir / f'{mesh_name}-{primitive_idx}-{file_suffix}'
+        )
 
-    @abc.abstractmethod
-    def _get_entry_point_name():
-        pass
-    
-    @abc.abstractmethod
-    def _get_hlsl_profile():
-        pass
-    
     @abc.abstractmethod
     def _get_glslc_stage():
         pass
@@ -68,6 +62,10 @@ def _compile_shader(shader, to_glsl):
     return shader.compile(to_glsl)
 
 class _HlslShader(_Shader):
+    @abc.abstractmethod
+    def _get_hlsl_profile():
+        pass
+
     def compile(self, to_glsl : bool) -> str:
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
@@ -79,7 +77,7 @@ class _HlslShader(_Shader):
             
             dxc.compile(
                 src_path = self._file_path,
-                entry_point_name = self._get_entry_point_name(),
+                entry_point_name = _impl.entry_point_name,
                 profile = self._get_hlsl_profile(),
                 to_spirv = to_glsl,
                 output_path = dxc_output_path
@@ -93,14 +91,11 @@ class _HlslShader(_Shader):
                 )
                 spv_path = Path(self._file_path).with_suffix('.spv')
 
-                # this is the default produced by SPIRV-Cross
-                glsl_entry_point_name = 'main'
-
                 glslc.compile(
                     src_path = glsl_path,
                     target_env = 'vulkan1.1',
                     shader_stage = self._get_glslc_stage(),
-                    entry_point_name = glsl_entry_point_name,
+                    entry_point_name = _impl.entry_point_name,
                     output_path = spv_path
                 )
         except subprocess.CalledProcessError as err:
@@ -117,11 +112,7 @@ class _HlslVertexShader(_HlslShader):
         primitive_idx : int
     ):
         super().__init__(out_dir, mesh_name, primitive_idx, 'VS.hlsl')
-    
-    @staticmethod
-    def _get_entry_point_name():
-        return _impl.vs_main
-    
+
     @staticmethod
     def _get_hlsl_profile():
         return 'vs_6_0'
@@ -143,10 +134,6 @@ class _HlslPixelShader(_HlslShader):
         super().__init__(out_dir, mesh_name, primitive_idx, 'PS.hlsl')
 
     @staticmethod
-    def _get_entry_point_name():
-        return _impl.ps_main
-    
-    @staticmethod
     def _get_hlsl_profile():
         return 'ps_6_0'
     
@@ -160,6 +147,42 @@ class _HlslPixelShader(_HlslShader):
             material,
             primitive
         )
+
+class _GlslShader(_Shader):
+    def compile(self, to_glsl : bool) -> str:
+        log = io.StringIO()
+        log, sys.stdout = sys.stdout, log
+
+        try:
+            glsl_output_path = Path(self._file_path).with_suffix('.spv')
+            glslc.compile(
+                src_path = self._file_path,
+                target_env = 'vulkan1.1',
+                shader_stage = self._get_glslc_stage(),
+                entry_point_name = _impl.entry_point_name,
+                output_path = glsl_output_path
+            )
+        except subprocess.CalledProcessError as err:
+            pass
+
+        log, sys.stdout = sys.stdout, log
+        return log.getvalue()
+    
+class _GlslFragmentShader(_GlslShader):
+    def __init__(
+        self,
+        out_dir : Path,
+        mesh_name : str,
+        primitive_idx : int
+    ):
+        super().__init__(out_dir, mesh_name, primitive_idx, 'frag.glsl')
+
+    @staticmethod
+    def _get_glslc_stage():
+        return 'fragment'
+
+    def _generate(self, shader_file, material, primitive):
+        _impl.generate_frag(shader_file, material, primitive)
 
 class _AssetResult(NamedTuple):
     log : io.StringIO
@@ -185,8 +208,10 @@ def _process_asset(
 
         for primitive_idx, primitive in enumerate(mesh.primitives):
             per_primitive_shaders = [
-                _HlslVertexShader(out_dir, mesh_name, primitive_idx),
-                _HlslPixelShader(out_dir, mesh_name, primitive_idx)
+                ShaderType(out_dir, mesh_name, primitive_idx)
+                for ShaderType in [
+                    _HlslVertexShader, _HlslPixelShader, _GlslFragmentShader
+                ]
             ]
             
             if not skip_codegen:

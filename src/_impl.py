@@ -15,6 +15,9 @@
 import math
 from typing import Any, NamedTuple
 from metashade.hlsl.sm6 import ps_6_0, vs_6_0
+from metashade.glsl import frag
+
+entry_point_name = 'main'
 
 def _generate_vs_out(sh, primitive):
     with sh.vs_output('VsOut') as VsOut:
@@ -92,8 +95,6 @@ def _generate_per_object_uniform_buffer(sh, is_ps : bool):
         if is_ps:
             sh.uniform('g_perObjectPbrFactors', sh.PbrFactors)
 
-vs_main = 'mainVS'
-
 def generate_vs(vs_file, primitive):
     sh = vs_6_0.Generator(
         vs_file,
@@ -134,7 +135,7 @@ def generate_vs(vs_file, primitive):
 
     _generate_vs_out(sh, primitive)
 
-    with sh.entry_point(vs_main, sh.VsOut)(vsIn = sh.VsIn):
+    with sh.entry_point(entry_point_name, sh.VsOut)(vsIn = sh.VsIn):
         sh.Pw = sh.g_WorldXf.xform(sh.vsIn.Pobj)
         sh.vsOut = sh.VsOut()
         sh.vsOut.Pclip = sh.g_VpXf.xform(sh.Pw)
@@ -151,8 +152,6 @@ def generate_vs(vs_file, primitive):
                 setattr(sh.vsOut, attr_name, getattr(sh.vsIn, attr_name))
 
         sh.return_(sh.vsOut)
-
-ps_main = 'mainPS'
 
 def generate_ps(ps_file, material, primitive):
     sh = ps_6_0.Generator(
@@ -537,7 +536,7 @@ def generate_ps(ps_file, material, primitive):
         sh.return_(sh.Nw)
 
     # Finally, the pixel shader entry point
-    with sh.entry_point(ps_main, sh.PsOut)(psIn = sh.VsOut):
+    with sh.entry_point(entry_point_name, sh.PsOut)(psIn = sh.VsOut):
         sh.Vw = (sh.g_cameraPw - sh.psIn.Pw).normalize()
         sh.Nw = sh.getNormal(psIn = sh.psIn)
         
@@ -573,3 +572,11 @@ def generate_ps(ps_file, material, primitive):
         sh.psOut.rgbaColor.rgb += sh.rgbEmissive
 
         sh.return_(sh.psOut)
+
+def generate_frag(frag_file, material, primitive):
+    sh = frag.Generator(frag_file, '450')
+
+    sh.f4OutColor = sh.out(sh.Float4, location=0)
+
+    with sh.entry_point('main')():
+        sh.f4OutColor = sh.Float4((1.0, 0.0, 0.0, 1.0))
