@@ -28,15 +28,15 @@ class _Shader(abc.ABC):
     def __init__(self, file_path):
         self._file_path = file_path
 
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def _get_entry_point_name():
         pass
     
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def _get_hlsl_profile():
         pass
     
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def _get_glsl_stage():
         pass
 
