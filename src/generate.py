@@ -25,8 +25,14 @@ from metashade.glsl.util import glslc
 import _impl
 
 class _Shader(abc.ABC):
-    def __init__(self, file_path):
-        self._file_path = file_path
+    def __init__(
+        self,
+        out_dir : Path,
+        mesh_name : str,
+        primitive_idx : int,
+        file_suffix : str
+    ):
+        self._file_path = out_dir / f'{mesh_name}-{primitive_idx}-{file_suffix}'
 
     @abc.abstractmethod
     def _get_entry_point_name():
@@ -37,7 +43,11 @@ class _Shader(abc.ABC):
         pass
     
     @abc.abstractmethod
-    def _get_glsl_stage():
+    def _get_glslc_stage():
+        pass
+
+    @abc.abstractmethod
+    def generate(self, material, primitive):
         pass
 
     def compile(self, to_glsl : bool) -> str:
@@ -71,7 +81,7 @@ class _Shader(abc.ABC):
                 glslc.compile(
                     src_path = glsl_path,
                     target_env = 'vulkan1.1',
-                    shader_stage = self._get_glsl_stage(),
+                    shader_stage = self._get_glslc_stage(),
                     entry_point_name = glsl_entry_point_name,
                     output_path = spv_path
                 )
@@ -83,6 +93,14 @@ class _Shader(abc.ABC):
         return log.getvalue()
 
 class _VertexShader(_Shader):
+    def __init__(
+        self,
+        out_dir : Path,
+        mesh_name : str,
+        primitive_idx : int
+    ):
+        super().__init__(out_dir, mesh_name, primitive_idx, 'VS.hlsl')
+    
     @staticmethod
     def _get_entry_point_name():
         return _impl.vs_main
@@ -92,10 +110,24 @@ class _VertexShader(_Shader):
         return 'vs_6_0'
     
     @staticmethod
-    def _get_glsl_stage():
+    def _get_glslc_stage():
         return 'vertex'
 
+    def generate(self, material, primitive):
+        with perf.TimedScope(f'Generating {self._file_path} ', 'Done'), \
+            open(self._file_path, 'w') as vs_file:
+            #
+            _impl.generate_vs(vs_file, primitive)
+
 class _PixelShader(_Shader):
+    def __init__(
+        self,
+        out_dir : Path,
+        mesh_name : str,
+        primitive_idx : int
+    ):
+        super().__init__(out_dir, mesh_name, primitive_idx, 'PS.hlsl')
+
     @staticmethod
     def _get_entry_point_name():
         return _impl.ps_main
@@ -105,8 +137,19 @@ class _PixelShader(_Shader):
         return 'ps_6_0'
     
     @staticmethod
-    def _get_glsl_stage():
+    def _get_glslc_stage():
         return 'fragment'
+    
+    def generate(self, material, primitive):
+        with perf.TimedScope(f'Generating {self._file_path} ', 'Done'), \
+            open(self._file_path, 'w') as ps_file:
+            #
+            _impl.generate_ps(
+                ps_file,
+                material,
+                primitive
+            )
+
 
 class _AssetResult(NamedTuple):
     log : io.StringIO
@@ -114,13 +157,13 @@ class _AssetResult(NamedTuple):
 
 def _process_asset(
         gltf_file_path : str,
-        out_dir : str,
+        out_dir : Path,
         skip_codegen : bool = False
 ) -> _AssetResult:
     log = io.StringIO()
     log, sys.stdout = sys.stdout, log
 
-    shaders = []
+    per_asset_shaders = []
 
     with perf.TimedScope(f'Loading glTF asset {gltf_file_path} '):
         gltf_asset = GLTF2().load(gltf_file_path)
@@ -131,33 +174,22 @@ def _process_asset(
         )
 
         for primitive_idx, primitive in enumerate(mesh.primitives):
-            def _get_file_path(stage : str):
-                return (
-                    Path(out_dir) / f'{mesh_name}-{primitive_idx}-{stage}.hlsl'
-                )
+            per_primitive_shaders = [
+                _VertexShader(out_dir, mesh_name, primitive_idx),
+                _PixelShader(out_dir, mesh_name, primitive_idx)
+            ]
             
-            file_path = _get_file_path('VS')
             if not skip_codegen:
-                with perf.TimedScope(f'Generating {file_path} ', 'Done'), \
-                    open(file_path, 'w') as vs_file:
-                    #
-                    _impl.generate_vs(vs_file, primitive)
-            shaders.append(_VertexShader(file_path))
-
-            file_path = _get_file_path('PS')
-            if not skip_codegen:
-                with perf.TimedScope(f'Generating {file_path} ', 'Done'), \
-                    open(file_path, 'w') as ps_file:
-                    #
-                    _impl.generate_ps(
-                        ps_file,
-                        gltf_asset.materials[primitive.material],
+                material = gltf_asset.materials[primitive.material]
+                for shader in per_primitive_shaders:
+                    shader.generate(
+                        material,
                         primitive
                     )
-            shaders.append(_PixelShader(file_path))
+            per_asset_shaders += per_primitive_shaders
 
     log, sys.stdout = sys.stdout, log
-    return _AssetResult(log.getvalue(), shaders)
+    return _AssetResult(log.getvalue(), per_asset_shaders)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -193,13 +225,14 @@ if __name__ == "__main__":
         raise NotADirectoryError(gltf_dir_path)
     
     os.makedirs(args.out_dir, exist_ok = True)
+    out_dir = Path(args.out_dir)
 
     shaders = []
     if args.serial:
         for gltf_path in gltf_dir_path.glob('**/*.gltf'):
             asset_result = _process_asset(
                 gltf_file_path = gltf_path,
-                out_dir = args.out_dir,
+                out_dir = out_dir,
                 skip_codegen = args.skip_codegen
             )
             print(asset_result.log)
@@ -209,7 +242,7 @@ if __name__ == "__main__":
             for asset_result in pool.imap_unordered(
                 functools.partial(
                     _process_asset,
-                    out_dir = args.out_dir,
+                    out_dir = out_dir,
                     skip_codegen = args.skip_codegen
                 ),
                 gltf_dir_path.glob('**/*.gltf')
