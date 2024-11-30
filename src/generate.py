@@ -47,8 +47,14 @@ class _Shader(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def generate(self, material, primitive):
+    def _generate(self, shader_file, material, primitive):
         pass
+
+    def generate(self, material, primitive):
+        with perf.TimedScope(f'Generating {self._file_path} ', 'Done'), \
+            open(self._file_path, 'w') as shader_file:
+            #
+            self._generate(shader_file, material, primitive)
 
     def compile(self, to_glsl : bool) -> str:
         log = io.StringIO()
@@ -113,11 +119,8 @@ class _VertexShader(_Shader):
     def _get_glslc_stage():
         return 'vertex'
 
-    def generate(self, material, primitive):
-        with perf.TimedScope(f'Generating {self._file_path} ', 'Done'), \
-            open(self._file_path, 'w') as vs_file:
-            #
-            _impl.generate_vs(vs_file, primitive)
+    def _generate(self, shader_file, material, primitive):
+        _impl.generate_vs(shader_file, primitive)
 
 class _PixelShader(_Shader):
     def __init__(
@@ -140,15 +143,12 @@ class _PixelShader(_Shader):
     def _get_glslc_stage():
         return 'fragment'
     
-    def generate(self, material, primitive):
-        with perf.TimedScope(f'Generating {self._file_path} ', 'Done'), \
-            open(self._file_path, 'w') as ps_file:
-            #
-            _impl.generate_ps(
-                ps_file,
-                material,
-                primitive
-            )
+    def _generate(self, shader_file, material, primitive):
+        _impl.generate_ps(
+            shader_file,
+            material,
+            primitive
+        )
 
 
 class _AssetResult(NamedTuple):
