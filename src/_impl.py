@@ -203,7 +203,7 @@ def generate_ps(ps_file, material, primitive):
             _def_material_texture(specularGlossiness, 'specularGlossiness')
             assert False, \
                 ('KHR_materials_pbrSpecularGlossiness is not implemented yet, '
-                'see https://github.com/ppenenko/metashade/issues/18')
+                'see https://github.com/metashade/metashade/issues/18')
     
     def _get_texture_uniform_name(name: str) -> str:
         return 'g_t' + name[0].upper() + name[1:]

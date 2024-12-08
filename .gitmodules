@@ -1,7 +1,7 @@
 [submodule "metashade"]
 	path = metashade
-	url = https://github.com/ppenenko/metashade.git
+	url = https://github.com/metashade/metashade.git
 [submodule "glTFSample"]
 	path = glTFSample
-	url = https://github.com/ppenenko/glTFSample.git
+	url = https://github.com/metashade/glTFSample.git
 	branch = metashade_demo
