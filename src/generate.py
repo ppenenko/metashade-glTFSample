@@ -189,9 +189,9 @@ class _AssetResult(NamedTuple):
     shaders : List[_Shader]
 
 def _process_asset(
-        gltf_file_path : str,
-        out_dir : Path,
-        skip_codegen : bool = False
+    gltf_file_path : str,
+    out_dir : Path,
+    skip_codegen : bool = False
 ) -> _AssetResult:
     log = io.StringIO()
     log, sys.stdout = sys.stdout, log
@@ -226,6 +226,64 @@ def _process_asset(
     log, sys.stdout = sys.stdout, log
     return _AssetResult(log.getvalue(), per_asset_shaders)
 
+def generate(
+    gltf_dir_path : Path,
+    out_dir_path : Path,
+    compile : bool,
+    to_glsl : bool,
+    skip_codegen : bool,
+    serial : bool
+):
+    if not gltf_dir_path.is_dir():
+        raise NotADirectoryError(gltf_dir_path)
+
+    os.makedirs(out_dir_path, exist_ok = True)
+
+    shaders = []
+    if serial:
+        for gltf_path in gltf_dir_path.glob('**/*.gltf'):
+            asset_result = _process_asset(
+                gltf_file_path = gltf_path,
+                out_dir = out_dir_path,
+                skip_codegen = skip_codegen
+            )
+            print(asset_result.log)
+            shaders += asset_result.shaders
+    else:
+        with mp.Pool() as pool:
+            for asset_result in pool.imap_unordered(
+                functools.partial(
+                    _process_asset,
+                    out_dir = out_dir_path,
+                    skip_codegen = skip_codegen
+                ),
+                gltf_dir_path.glob('**/*.gltf')
+            ):
+                print(asset_result.log)
+                shaders += asset_result.shaders
+
+    if compile:
+        print()
+        dxc.identify()
+        if to_glsl:
+            spirv_cross.identify()
+            glslc.identify()
+
+        if serial:
+            for shader in shaders:
+                log = shader.compile(to_glsl = to_glsl)
+                print(log, end = '')
+        else:
+            with mp.Pool() as pool:
+                for log in pool.imap_unordered(
+                    functools.partial(
+                        _compile_shader,
+                        to_glsl = to_glsl
+                    ),
+                    shaders
+                ):
+                    print(log, end = '')
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description = "Generate shaders from glTF materials."
@@ -255,54 +313,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    gltf_dir_path = Path(args.gltf_dir)
-    if not gltf_dir_path.is_dir():
-        raise NotADirectoryError(gltf_dir_path)
-    
-    os.makedirs(args.out_dir, exist_ok = True)
-    out_dir = Path(args.out_dir)
-
-    shaders = []
-    if args.serial:
-        for gltf_path in gltf_dir_path.glob('**/*.gltf'):
-            asset_result = _process_asset(
-                gltf_file_path = gltf_path,
-                out_dir = out_dir,
-                skip_codegen = args.skip_codegen
-            )
-            print(asset_result.log)
-            shaders += asset_result.shaders
-    else:
-        with mp.Pool() as pool:
-            for asset_result in pool.imap_unordered(
-                functools.partial(
-                    _process_asset,
-                    out_dir = out_dir,
-                    skip_codegen = args.skip_codegen
-                ),
-                gltf_dir_path.glob('**/*.gltf')
-            ):
-                print(asset_result.log)
-                shaders += asset_result.shaders
-
-    if args.compile:
-        print()
-        dxc.identify()
-        if args.to_glsl:
-            spirv_cross.identify()
-            glslc.identify()
-
-        if args.serial:
-            for shader in shaders:
-                log = shader.compile(to_glsl = args.to_glsl)
-                print(log, end = '')
-        else:
-            with mp.Pool() as pool:
-                for log in pool.imap_unordered(
-                    functools.partial(
-                        _compile_shader,
-                        to_glsl = args.to_glsl
-                    ),
-                    shaders
-                ):
-                    print(log, end = '')
+    generate(
+        gltf_dir_path = Path(args.gltf_dir),
+        out_dir_path = Path(args.out_dir),
+        compile = args.compile,
+        to_glsl = args.to_glsl,
+        skip_codegen = args.skip_codegen,
+        serial = args.serial
+    )
