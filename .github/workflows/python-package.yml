@@ -62,4 +62,8 @@ jobs:
         Add-Content $env:GITHUB_ENV METASHADE_PYTEST_OUT_DIR=$env:GITHUB_WORKSPACE/tests/out
     - name: Test with pytest
       run: |
-        pytest
+        pytest -rP tests
+    - name: Print the directory tree
+      run: |
+        pwd
+        tree /F
