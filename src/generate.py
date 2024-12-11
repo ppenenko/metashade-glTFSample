@@ -18,9 +18,9 @@ import multiprocessing as mp
 from typing import List, NamedTuple
 from pygltflib import GLTF2
 
-from metashade.hlsl.util import dxc
 from metashade.util import perf, spirv_cross
-from metashade.glsl.util import glslc
+from metashade.hlsl.util import dxc
+from metashade.glsl.util import glslang, glslc
 
 import _impl
 
@@ -155,11 +155,10 @@ class _GlslShader(_Shader):
 
         try:
             glsl_output_path = Path(self._file_path).with_suffix('.spv')
-            glslc.compile(
+            glslang.compile(
                 src_path = self._file_path,
                 target_env = 'vulkan1.1',
-                shader_stage = self._get_glslc_stage(),
-                entry_point_name = _impl.entry_point_name,
+                shader_stage = 'frag',
                 output_path = glsl_output_path
             )
         except subprocess.CalledProcessError as err:
@@ -265,9 +264,11 @@ def generate(
     if compile:
         print()
         dxc.identify()
+        glslang.identify()
+
         if to_glsl:
-            spirv_cross.identify()
             glslc.identify()
+            spirv_cross.identify()
 
         if serial:
             for shader in shaders:
