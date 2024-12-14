@@ -36,5 +36,6 @@ class TestGenerate:
             compile = True,
             to_glsl = False,
             skip_codegen = False,
-            serial = False
+            serial = False,
+            ignore_compile_errors = False
         )

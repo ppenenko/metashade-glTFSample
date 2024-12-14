@@ -54,19 +54,23 @@ class _Shader(abc.ABC):
     def compile(self, to_glsl : bool) -> str:
         pass
 
-def _compile_shader(shader, to_glsl):
+def _compile_shader(
+    shader,
+    to_glsl : bool,
+    ignore_compile_errors : bool
+) -> str:
     '''
     Helper function to compile a shader in a process pool.
     Without it, the pool would not be able to pickle the method.
     '''
-    return shader.compile(to_glsl)
+    return shader.compile(to_glsl, ignore_compile_errors)
 
 class _HlslShader(_Shader):
     @abc.abstractmethod
     def _get_hlsl_profile():
         pass
 
-    def compile(self, to_glsl : bool) -> str:
+    def compile(self, to_glsl : bool, ignore_compile_errors : bool) -> str:
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
 
@@ -99,7 +103,8 @@ class _HlslShader(_Shader):
                     output_path = spv_path
                 )
         except subprocess.CalledProcessError as err:
-            pass
+            if not ignore_compile_errors:
+                raise err
 
         log, sys.stdout = sys.stdout, log
         return log.getvalue()
@@ -149,7 +154,7 @@ class _HlslPixelShader(_HlslShader):
         )
 
 class _GlslShader(_Shader):
-    def compile(self, to_glsl : bool) -> str:
+    def compile(self, to_glsl : bool, ignore_compile_errors : bool ) -> str:
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
 
@@ -162,7 +167,8 @@ class _GlslShader(_Shader):
                 output_path = glsl_output_path
             )
         except subprocess.CalledProcessError as err:
-            pass
+            if not ignore_compile_errors:
+                raise err
 
         log, sys.stdout = sys.stdout, log
         return log.getvalue()
@@ -231,7 +237,8 @@ def generate(
     compile : bool,
     to_glsl : bool,
     skip_codegen : bool,
-    serial : bool
+    serial : bool,
+    ignore_compile_errors : bool
 ):
     if not gltf_dir_path.is_dir():
         raise NotADirectoryError(gltf_dir_path)
@@ -272,14 +279,18 @@ def generate(
 
         if serial:
             for shader in shaders:
-                log = shader.compile(to_glsl = to_glsl)
+                log = shader.compile(
+                    to_glsl = to_glsl,
+                    ignore_compile_errors = ignore_compile_errors
+                )
                 print(log, end = '')
         else:
             with mp.Pool() as pool:
                 for log in pool.imap_unordered(
                     functools.partial(
                         _compile_shader,
-                        to_glsl = to_glsl
+                        to_glsl = to_glsl,
+                        ignore_compile_errors = ignore_compile_errors
                     ),
                     shaders
                 ):
@@ -320,5 +331,6 @@ if __name__ == "__main__":
         compile = args.compile,
         to_glsl = args.to_glsl,
         skip_codegen = args.skip_codegen,
-        serial = args.serial
+        serial = args.serial,
+        ignore_compile_errors = True # just collect all errors in stdout
     )
