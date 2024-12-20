@@ -5,3 +5,6 @@
 	path = glTFSample
 	url = https://github.com/metashade/glTFSample.git
 	branch = metashade_demo
+[submodule "tests/ref"]
+	path = tests/ref
+	url = https://github.com/metashade/metashade-glTFSample-testrefs.git

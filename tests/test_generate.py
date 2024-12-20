@@ -12,17 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os, sys
+import sys
 from pathlib import Path
 
 tests_dir_path = Path(__file__).parent
 repo_root_dir_path = tests_dir_path.parent
+
+# Add these directories to PYTHONPATH
 src_dir_path = (repo_root_dir_path / 'src').resolve()
 metashade_dir_path = (repo_root_dir_path / 'metashade').resolve()
-
 sys.path += [str(src_dir_path), str(metashade_dir_path)]
 
+from metashade.util.tests import RefDiffer
 import generate
+
+ref_differ = RefDiffer(
+    ref_dir = repo_root_dir_path / 'tests' / 'ref',
+    out_dir_env_var = 'METASHADE_GLTFSAMPLE_PYTEST_OUT_DIR'
+)
 
 class TestGenerate:
     def test_generate(self):
