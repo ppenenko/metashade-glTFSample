@@ -59,7 +59,7 @@ jobs:
       run: |
         Add-Content $env:GITHUB_PATH $env:GITHUB_WORKSPACE\.dxc\bin\x64
         Add-Content $env:GITHUB_PATH $env:GITHUB_WORKSPACE\.glslang\bin
-        Add-Content $env:GITHUB_ENV METASHADE_PYTEST_OUT_DIR=$env:GITHUB_WORKSPACE/tests/out
+        Add-Content $env:GITHUB_ENV METASHADE_GLTFSAMPLE_PYTEST_OUT_DIR=$env:GITHUB_WORKSPACE/tests/out
     - name: Test with pytest
       run: |
         pytest -rP tests
