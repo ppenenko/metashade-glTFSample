@@ -41,8 +41,10 @@ class TestGenerate:
             cls._ref_differ = None
         else:
             cls._out_dir = Path(out_dir).resolve()
+            print(f'Reference directory: {ref_dir}')
             cls._ref_differ = RefDiffer(ref_dir)
 
+        print(f'Test output directory: {cls._out_dir}')
         os.makedirs(cls._out_dir, exist_ok = True)
 
     def test_generate(self):
