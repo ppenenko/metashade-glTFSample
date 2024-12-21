@@ -537,6 +537,8 @@ def generate_ps(ps_file, material, primitive):
 
     # Finally, the pixel shader entry point
     with sh.entry_point(entry_point_name, sh.PsOut)(psIn = sh.VsOut):
+        sh // "Test diffing in the test"
+
         sh.Vw = (sh.g_cameraPw - sh.psIn.Pw).normalize()
         sh.Nw = sh.getNormal(psIn = sh.psIn)
         
