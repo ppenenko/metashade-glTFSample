@@ -55,8 +55,17 @@ class _Shader(abc.ABC):
         success : bool
 
     @abc.abstractmethod
-    def compile(self, to_glsl : bool) -> CompileResult:
+    def _compile(self, to_glsl : bool) -> bool:
         pass
+
+    def compile(self, to_glsl : bool) -> CompileResult:
+        log = io.StringIO()
+        log, sys.stdout = sys.stdout, log
+
+        success = self._compile(to_glsl)
+
+        log, sys.stdout = sys.stdout, log
+        return _Shader.CompileResult(log.getvalue(), success)
 
 def _compile_shader(shader, to_glsl : bool) -> _Shader.CompileResult:
     '''
@@ -70,10 +79,7 @@ class _HlslShader(_Shader):
     def _get_hlsl_profile():
         pass
 
-    def compile(self, to_glsl : bool) -> _Shader.CompileResult:
-        log = io.StringIO()
-        log, sys.stdout = sys.stdout, log
-
+    def _compile(self, to_glsl : bool) -> bool:
         try:
             dxc_output_path = Path(self._file_path).with_suffix(
                 '.hlsl.spv' if to_glsl else '.cso'
@@ -102,12 +108,9 @@ class _HlslShader(_Shader):
                     entry_point_name = _impl.entry_point_name,
                     output_path = spv_path
                 )
-            success = True
+            return True
         except subprocess.CalledProcessError as err:
-            success = False
-
-        log, sys.stdout = sys.stdout, log
-        return _Shader.CompileResult(log.getvalue(), success)
+            return False
 
 class _HlslVertexShader(_HlslShader):
     def __init__(
@@ -154,10 +157,7 @@ class _HlslPixelShader(_HlslShader):
         )
 
 class _GlslShader(_Shader):
-    def compile(self, to_glsl : bool) -> _Shader.CompileResult:
-        log = io.StringIO()
-        log, sys.stdout = sys.stdout, log
-
+    def _compile(self, to_glsl : bool) -> bool:
         try:
             glsl_output_path = Path(self._file_path).with_suffix('.spv')
             glslang.compile(
@@ -166,12 +166,9 @@ class _GlslShader(_Shader):
                 shader_stage = 'frag',
                 output_path = glsl_output_path
             )
-            success = True
+            return True
         except subprocess.CalledProcessError as err:
-            success = False
-
-        log, sys.stdout = sys.stdout, log
-        return _Shader.CompileResult(log.getvalue(), success)
+            return False
     
 class _GlslFragmentShader(_GlslShader):
     def __init__(
