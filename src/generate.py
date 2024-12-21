@@ -21,6 +21,7 @@ from pygltflib import GLTF2
 from metashade.util import perf, spirv_cross
 from metashade.hlsl.util import dxc
 from metashade.glsl.util import glslang, glslc
+from metashade.util.tests import RefDiffer
 
 import _impl
 
@@ -58,21 +59,28 @@ class _Shader(abc.ABC):
     def _compile(self, to_glsl : bool) -> bool:
         pass
 
-    def compile(self, to_glsl : bool) -> CompileResult:
+    def compile(self, to_glsl : bool, ref_differ : RefDiffer) -> CompileResult:
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
+
+        if ref_differ is not None:
+            ref_differ(self._file_path)
 
         success = self._compile(to_glsl)
 
         log, sys.stdout = sys.stdout, log
         return _Shader.CompileResult(log.getvalue(), success)
 
-def _compile_shader(shader, to_glsl : bool) -> _Shader.CompileResult:
+def _compile_shader(
+    shader,
+    to_glsl : bool,
+    ref_differ : RefDiffer
+) -> _Shader.CompileResult:
     '''
     Helper function to compile a shader in a process pool.
     Without it, the pool would not be able to pickle the method.
     '''
-    return shader.compile(to_glsl)
+    return shader.compile(to_glsl, ref_differ)
 
 class _HlslShader(_Shader):
     @abc.abstractmethod
@@ -234,7 +242,8 @@ def generate(
     compile : bool,
     to_glsl : bool,
     skip_codegen : bool,
-    serial : bool
+    serial : bool,
+    ref_differ : RefDiffer
 ):
     if not gltf_dir_path.is_dir():
         raise NotADirectoryError(gltf_dir_path)
@@ -277,7 +286,10 @@ def generate(
 
         if serial:
             for shader in shaders:
-                result = shader.compile(to_glsl = to_glsl)
+                result = shader.compile(
+                    to_glsl = to_glsl,
+                    ref_differ = ref_differ
+        )
                 if not result.success:
                     num_failed += 1
                 print(result.log, end = '')
@@ -286,7 +298,8 @@ def generate(
                 for result in pool.imap_unordered(
                     functools.partial(
                         _compile_shader,
-                        to_glsl = to_glsl
+                        to_glsl = to_glsl,
+                        ref_differ = ref_differ
                     ),
                     shaders
                 ):
@@ -308,6 +321,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--gltf-dir", help = "Path to the source glTF assets")
     parser.add_argument("--out-dir", help = "Path to the output directory")
+    parser.add_argument("--ref-dir", help = "Path to the test references")
+    
     parser.add_argument(
         "--compile",
         action = 'store_true',
@@ -337,5 +352,6 @@ if __name__ == "__main__":
         compile = args.compile,
         to_glsl = args.to_glsl,
         skip_codegen = args.skip_codegen,
-        serial = args.serial
+        serial = args.serial,
+        ref_differ = RefDiffer(Path(args.ref_dir)) if args.ref_dir else None
     )
