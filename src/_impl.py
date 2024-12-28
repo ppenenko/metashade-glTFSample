@@ -576,7 +576,7 @@ def generate_ps(ps_file, material, primitive):
 def generate_frag(frag_file, material, primitive):
     sh = frag.Generator(frag_file, '450')
 
-    sh.f4OutColor = sh.out(sh.Float4, location=0)
+    sh.out_f4Color = sh.stage_output(sh.Float4, location = 0)
 
     with sh.entry_point('main')():
-        sh.f4OutColor = sh.Float4((1.0, 0.0, 0.0, 1.0))
+        sh.out_f4Color = sh.Float4((1.0, 0.0, 0.0, 1.0))
