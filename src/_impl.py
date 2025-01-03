@@ -51,7 +51,7 @@ def _generate_per_frame_uniform_buffer(sh):
         iShadowMap = sh.Float # should be an int, unused for now
     )
 
-    with sh.uniform_buffer(register = 0, name = 'cbPerFrame'):
+    with sh.uniform_buffer(dx_register = 0, name = 'cbPerFrame'):
         sh.uniform('g_VpXf', sh.Matrix4x4f)
         sh.uniform('g_prevVpXf', sh.Matrix4x4f)
         sh.uniform('g_VpIXf', sh.Matrix4x4f)
@@ -89,7 +89,7 @@ def _generate_per_object_uniform_buffer(sh, is_ps : bool):
             fGlossiness = sh.Float
         )
 
-    with sh.uniform_buffer(register = 1, name = 'cbPerObject'):
+    with sh.uniform_buffer(dx_register = 1, name = 'cbPerObject'):
         sh.uniform('g_WorldXf', sh.Matrix3x4f)
         sh.uniform('g_prevWorldXf', sh.Matrix3x4f)
         if is_ps:
@@ -219,12 +219,12 @@ def generate_ps(ps_file, material, primitive):
         sh.uniform(
             _get_texture_uniform_name(texture_name),
             sh.Texture2d(texel_type = material_texture.texel_type),
-            register = texture_idx
+            dx_register = texture_idx
         )
         sh.uniform(
             _get_sampler_uniform_name(texture_name),
             sh.Sampler,
-            register = texture_idx
+            dx_register = texture_idx
         )
 
     # IBL texture/sampler definitions
@@ -237,18 +237,18 @@ def generate_ps(ps_file, material, primitive):
         sh.uniform(
             _get_texture_uniform_name(ibl_texture_name),
             ibl_texture_type,
-            register = texture_idx
+            dx_register = texture_idx
         )
         sh.uniform(
             _get_sampler_uniform_name(ibl_texture_name),
             sh.Sampler,
-            register = texture_idx
+            dx_register = texture_idx
         )
 
     # The shadow map registers are hardcoded in the host app
     shadow_map_register = 9
-    sh.uniform('g_tShadowMap', sh.Texture2d, register = shadow_map_register)
-    sh.uniform('g_sShadowMap', sh.SamplerCmp, register = shadow_map_register)
+    sh.uniform('g_tShadowMap', sh.Texture2d, dx_register = shadow_map_register)
+    sh.uniform('g_sShadowMap', sh.SamplerCmp, dx_register = shadow_map_register)
 
     def _get_material_uv(texture_name : str):
         material_texture = material_textures.get(texture_name)
