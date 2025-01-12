@@ -23,180 +23,22 @@ from metashade.hlsl.util import dxc
 from metashade.glsl.util import glslang, glslc
 from metashade.util.tests import RefDiffer
 
-import _impl
-
-class _Shader(abc.ABC):
-    def __init__(
-        self,
-        out_dir : Path,
-        mesh_name : str,
-        primitive_idx : int,
-        file_suffix : str
-    ):
-        self._file_path = (
-            out_dir / f'{mesh_name}-{primitive_idx}-{file_suffix}'
-        )
-
-    @abc.abstractmethod
-    def _get_glslc_stage():
-        pass
-
-    @abc.abstractmethod
-    def _generate(self, shader_file, material, primitive):
-        pass
-
-    def generate(self, material, primitive):
-        with perf.TimedScope(f'Generating {self._file_path} ', 'Done'), \
-            open(self._file_path, 'w') as shader_file:
-            #
-            self._generate(shader_file, material, primitive)
-
-    class CompileResult(NamedTuple):
-        log : str
-        success : bool
-
-    @abc.abstractmethod
-    def _compile(self, to_glsl : bool) -> bool:
-        pass
-
-    def compile(self, to_glsl : bool, ref_differ : RefDiffer) -> CompileResult:
-        log = io.StringIO()
-        log, sys.stdout = sys.stdout, log
-
-        if ref_differ is not None:
-            ref_differ(self._file_path)
-
-        success = self._compile(to_glsl)
-
-        log, sys.stdout = sys.stdout, log
-        return _Shader.CompileResult(log.getvalue(), success)
+import _shader_base, _hlsl, _glsl
 
 def _compile_shader(
     shader,
     to_glsl : bool,
     ref_differ : RefDiffer
-) -> _Shader.CompileResult:
+) -> _shader_base.Shader.CompileResult:
     '''
     Helper function to compile a shader in a process pool.
     Without it, the pool would not be able to pickle the method.
     '''
     return shader.compile(to_glsl, ref_differ)
 
-class _HlslShader(_Shader):
-    @abc.abstractmethod
-    def _get_hlsl_profile():
-        pass
-
-    def _compile(self, to_glsl : bool) -> bool:
-        try:
-            dxc_output_path = Path(self._file_path).with_suffix(
-                '.hlsl.spv' if to_glsl else '.cso'
-            )
-            
-            dxc.compile(
-                src_path = self._file_path,
-                entry_point_name = _impl.entry_point_name,
-                profile = self._get_hlsl_profile(),
-                to_spirv = to_glsl,
-                output_path = dxc_output_path
-            )
-
-            if to_glsl:
-                glsl_path = Path(self._file_path).with_suffix('.glsl')
-                spirv_cross.spirv_to_glsl(
-                    spirv_path = dxc_output_path,
-                    glsl_path = glsl_path
-                )
-                spv_path = Path(self._file_path).with_suffix('.spv')
-
-                glslc.compile(
-                    src_path = glsl_path,
-                    target_env = 'vulkan1.1',
-                    shader_stage = self._get_glslc_stage(),
-                    entry_point_name = _impl.entry_point_name,
-                    output_path = spv_path
-                )
-            return True
-        except subprocess.CalledProcessError as err:
-            return False
-
-class _HlslVertexShader(_HlslShader):
-    def __init__(
-        self,
-        out_dir : Path,
-        mesh_name : str,
-        primitive_idx : int
-    ):
-        super().__init__(out_dir, mesh_name, primitive_idx, 'VS.hlsl')
-
-    @staticmethod
-    def _get_hlsl_profile():
-        return 'vs_6_0'
-    
-    @staticmethod
-    def _get_glslc_stage():
-        return 'vertex'
-
-    def _generate(self, shader_file, material, primitive):
-        _impl.generate_vs(shader_file, primitive)
-
-class _HlslPixelShader(_HlslShader):
-    def __init__(
-        self,
-        out_dir : Path,
-        mesh_name : str,
-        primitive_idx : int
-    ):
-        super().__init__(out_dir, mesh_name, primitive_idx, 'PS.hlsl')
-
-    @staticmethod
-    def _get_hlsl_profile():
-        return 'ps_6_0'
-    
-    @staticmethod
-    def _get_glslc_stage():
-        return 'fragment'
-    
-    def _generate(self, shader_file, material, primitive):
-        _impl.generate_ps(
-            shader_file,
-            material,
-            primitive
-        )
-
-class _GlslShader(_Shader):
-    def _compile(self, to_glsl : bool) -> bool:
-        try:
-            glsl_output_path = Path(self._file_path).with_suffix('.spv')
-            glslang.compile(
-                src_path = self._file_path,
-                target_env = 'vulkan1.1',
-                shader_stage = 'frag',
-                output_path = glsl_output_path
-            )
-            return True
-        except subprocess.CalledProcessError as err:
-            return False
-    
-class _GlslFragmentShader(_GlslShader):
-    def __init__(
-        self,
-        out_dir : Path,
-        mesh_name : str,
-        primitive_idx : int
-    ):
-        super().__init__(out_dir, mesh_name, primitive_idx, 'frag.glsl')
-
-    @staticmethod
-    def _get_glslc_stage():
-        return 'fragment'
-
-    def _generate(self, shader_file, material, primitive):
-        _impl.generate_frag(shader_file, material, primitive)
-
 class _AssetResult(NamedTuple):
     log : io.StringIO
-    shaders : List[_Shader]
+    shaders : List[_shader_base.Shader]
 
 def _process_asset(
     gltf_file_path : str,
@@ -220,7 +62,7 @@ def _process_asset(
             per_primitive_shaders = [
                 ShaderType(out_dir, mesh_name, primitive_idx)
                 for ShaderType in [
-                    _HlslVertexShader, _HlslPixelShader, _GlslFragmentShader
+                    _hlsl.VertexShader, _hlsl.PixelShader, _glsl.FragmentShader
                 ]
             ]
             
@@ -251,24 +93,22 @@ def generate(
     os.makedirs(out_dir_path, exist_ok = True)
 
     shaders = []
+    process_asset_partial = functools.partial(
+        _process_asset,
+        out_dir = out_dir_path,
+        skip_codegen = skip_codegen
+    )
+    gltf_files_glob = gltf_dir_path.glob('**/*.gltf')
     if serial:
-        for gltf_path in gltf_dir_path.glob('**/*.gltf'):
-            asset_result = _process_asset(
-                gltf_file_path = gltf_path,
-                out_dir = out_dir_path,
-                skip_codegen = skip_codegen
-            )
+        for gltf_path in gltf_files_glob:
+            asset_result = process_asset_partial(gltf_file_path = gltf_path)
             print(asset_result.log)
             shaders += asset_result.shaders
     else:
         with mp.Pool() as pool:
             for asset_result in pool.imap_unordered(
-                functools.partial(
-                    _process_asset,
-                    out_dir = out_dir_path,
-                    skip_codegen = skip_codegen
-                ),
-                gltf_dir_path.glob('**/*.gltf')
+                process_asset_partial,
+                gltf_files_glob
             ):
                 print(asset_result.log)
                 shaders += asset_result.shaders
