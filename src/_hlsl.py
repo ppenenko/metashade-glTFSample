@@ -62,10 +62,9 @@ class VertexShader(Shader):
     def __init__(
         self,
         out_dir : Path,
-        mesh_name : str,
-        primitive_idx : int
+        shader_name : str
     ):
-        super().__init__(out_dir, mesh_name, primitive_idx, 'VS.hlsl')
+        super().__init__(out_dir, shader_name, 'VS.hlsl')
 
     @staticmethod
     def _get_hlsl_profile():
@@ -82,10 +81,9 @@ class PixelShader(Shader):
     def __init__(
         self,
         out_dir : Path,
-        mesh_name : str,
-        primitive_idx : int
+        shader_name : str
     ):
-        super().__init__(out_dir, mesh_name, primitive_idx, 'PS.hlsl')
+        super().__init__(out_dir, shader_name, 'PS.hlsl')
 
     @staticmethod
     def _get_hlsl_profile():

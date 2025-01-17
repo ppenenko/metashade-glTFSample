@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import abc, argparse, functools, io, os, subprocess, sys
+import argparse, functools, io, json, os, sys
 from pathlib import Path
 import multiprocessing as mp
 from typing import List, NamedTuple
@@ -49,6 +49,7 @@ def _process_asset(
     log, sys.stdout = sys.stdout, log
 
     per_asset_shaders = []
+    per_asset_shader_index = []
 
     with perf.TimedScope(f'Loading glTF asset {gltf_file_path} '):
         gltf_asset = GLTF2().load(gltf_file_path)
@@ -58,14 +59,19 @@ def _process_asset(
             else f'UnnamedMesh{mesh_idx}'
         )
 
+        per_mesh_shader_index = []
+
         for primitive_idx, primitive in enumerate(mesh.primitives):
+            shader_name = f'{mesh_name}-{primitive_idx}'
+            per_mesh_shader_index.append(shader_name)
+
             per_primitive_shaders = [
-                ShaderType(out_dir, mesh_name, primitive_idx)
+                ShaderType(out_dir, shader_name)
                 for ShaderType in [
                     _hlsl.VertexShader, _hlsl.PixelShader, _glsl.FragmentShader
                 ]
             ]
-            
+
             if not skip_codegen:
                 material = gltf_asset.materials[primitive.material]
                 for shader in per_primitive_shaders:
@@ -75,8 +81,23 @@ def _process_asset(
                     )
             per_asset_shaders += per_primitive_shaders
 
+        per_asset_shader_index.append(per_mesh_shader_index)
+        shader_index_file_path = (
+            out_dir / gltf_file_path.with_suffix('.json').name
+        )
+        with open(shader_index_file_path, 'w') as shader_index_file:
+            json.dump(
+                per_asset_shader_index,
+                shader_index_file,
+                indent = 4
+            )
+        print(f'Shader index written to {shader_index_file_path}\n')
+
     log, sys.stdout = sys.stdout, log
-    return _AssetResult(log.getvalue(), per_asset_shaders)
+    return _AssetResult(
+        log = log.getvalue(),
+        shaders = per_asset_shaders
+    )
 
 def generate(
     gltf_dir_path : Path,
@@ -93,12 +114,14 @@ def generate(
     os.makedirs(out_dir_path, exist_ok = True)
 
     shaders = []
+
     process_asset_partial = functools.partial(
         _process_asset,
         out_dir = out_dir_path,
         skip_codegen = skip_codegen
     )
     gltf_files_glob = gltf_dir_path.glob('**/*.gltf')
+
     if serial:
         for gltf_path in gltf_files_glob:
             asset_result = process_asset_partial(gltf_file_path = gltf_path)

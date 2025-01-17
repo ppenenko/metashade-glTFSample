@@ -24,12 +24,11 @@ class Shader(abc.ABC):
     def __init__(
         self,
         out_dir : Path,
-        mesh_name : str,
-        primitive_idx : int,
+        shader_name : str,
         file_suffix : str
     ):
         self._file_path = (
-            out_dir / f'{mesh_name}-{primitive_idx}-{file_suffix}'
+            out_dir / f'{shader_name}-{file_suffix}'
         )
 
     @abc.abstractmethod

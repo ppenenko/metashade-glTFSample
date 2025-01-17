@@ -35,10 +35,9 @@ class FragmentShader(Shader):
     def __init__(
         self,
         out_dir : Path,
-        mesh_name : str,
-        primitive_idx : int
+        shader_name : str
     ):
-        super().__init__(out_dir, mesh_name, primitive_idx, 'frag.glsl')
+        super().__init__(out_dir, shader_name, 'frag.glsl')
 
     @staticmethod
     def _get_glslc_stage():
