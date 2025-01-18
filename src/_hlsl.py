@@ -36,6 +36,7 @@ class Shader(_shader_base.Shader):
                 entry_point_name = _impl.entry_point_name,
                 profile = self._get_hlsl_profile(),
                 to_spirv = to_glsl,
+                o0 = to_glsl,
                 output_path = dxc_output_path
             )
 
