@@ -62,15 +62,19 @@ def _process_asset(
         per_mesh_shader_index = []
 
         for primitive_idx, primitive in enumerate(mesh.primitives):
-            shader_name = f'{mesh_name}-{primitive_idx}'
-            per_mesh_shader_index.append(shader_name)
+            shader_base_name = f'{mesh_name}-{primitive_idx}'
+            per_mesh_shader_index.append(shader_base_name)
+
+            dx_shaders = 
 
             per_primitive_shaders = [
-                ShaderType(out_dir, shader_name)
+                ShaderType(out_dir, shader_base_name)
                 for ShaderType in [
                     _hlsl.VertexShader, _hlsl.PixelShader, _glsl.FragmentShader
                 ]
             ]
+
+            per_primitive_shaders = { shader.file_path.name }
 
             if not skip_codegen:
                 material = gltf_asset.materials[primitive.material]

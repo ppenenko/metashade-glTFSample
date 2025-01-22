@@ -27,7 +27,7 @@ class Shader(abc.ABC):
         shader_name : str,
         file_suffix : str
     ):
-        self._file_path = (
+        self.file_path = (
             out_dir / f'{shader_name}-{file_suffix}'
         )
 
@@ -40,8 +40,8 @@ class Shader(abc.ABC):
         pass
 
     def generate(self, material, primitive):
-        with perf.TimedScope(f'Generating {self._file_path} ', 'Done'), \
-            open(self._file_path, 'w') as shader_file:
+        with perf.TimedScope(f'Generating {self.file_path} ', 'Done'), \
+            open(self.file_path, 'w') as shader_file:
             #
             self._generate(shader_file, material, primitive)
 
@@ -58,7 +58,7 @@ class Shader(abc.ABC):
         log, sys.stdout = sys.stdout, log
 
         if ref_differ is not None:
-            ref_differ(self._file_path)
+            ref_differ(self.file_path)
 
         success = self._compile(to_glsl)
 

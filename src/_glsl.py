@@ -20,9 +20,9 @@ import subprocess
 class Shader(_shader_base.Shader):
     def _compile(self, to_glsl : bool) -> bool:
         try:
-            glsl_output_path = Path(self._file_path).with_suffix('.spv')
+            glsl_output_path = Path(self.file_path).with_suffix('.spv')
             glslang.compile(
-                src_path = self._file_path,
+                src_path = self.file_path,
                 target_env = 'vulkan1.1',
                 shader_stage = 'frag',
                 output_path = glsl_output_path

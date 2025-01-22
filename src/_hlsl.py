@@ -27,12 +27,12 @@ class Shader(_shader_base.Shader):
 
     def _compile(self, to_glsl : bool) -> bool:
         try:
-            dxc_output_path = Path(self._file_path).with_suffix(
+            dxc_output_path = Path(self.file_path).with_suffix(
                 '.hlsl.spv' if to_glsl else '.cso'
             )
             
             dxc.compile(
-                src_path = self._file_path,
+                src_path = self.file_path,
                 entry_point_name = _impl.entry_point_name,
                 profile = self._get_hlsl_profile(),
                 to_spirv = to_glsl,
@@ -41,12 +41,12 @@ class Shader(_shader_base.Shader):
             )
 
             if to_glsl:
-                glsl_path = Path(self._file_path).with_suffix('.glsl')
+                glsl_path = Path(self.file_path).with_suffix('.glsl')
                 spirv_cross.spirv_to_glsl(
                     spirv_path = dxc_output_path,
                     glsl_path = glsl_path
                 )
-                spv_path = Path(self._file_path).with_suffix('.spv')
+                spv_path = Path(self.file_path).with_suffix('.spv')
 
                 glslc.compile(
                     src_path = glsl_path,
