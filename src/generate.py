@@ -27,14 +27,13 @@ import _shader_base, _hlsl, _glsl
 
 def _compile_shader(
     shader,
-    to_glsl : bool,
     ref_differ : RefDiffer
 ) -> _shader_base.Shader.CompileResult:
     '''
     Helper function to compile a shader in a process pool.
     Without it, the pool would not be able to pickle the method.
     '''
-    return shader.compile(to_glsl, ref_differ)
+    return shader.compile(ref_differ)
 
 class _AssetResult(NamedTuple):
     log : io.StringIO
@@ -42,14 +41,13 @@ class _AssetResult(NamedTuple):
 
 def _process_asset(
     gltf_file_path : str,
-    out_dir : Path,
-    skip_codegen : bool = False
+    out_dir : Path
 ) -> _AssetResult:
     log = io.StringIO()
     log, sys.stdout = sys.stdout, log
 
-    per_asset_shaders = []
-    per_asset_shader_index = []
+    per_asset_shader_list = []  # List of shaders to compile by this script
+    per_asset_shader_index = [] # Dictionary of shaders per mesh and primitive
 
     with perf.TimedScope(f'Loading glTF asset {gltf_file_path} '):
         gltf_asset = GLTF2().load(gltf_file_path)
@@ -62,24 +60,33 @@ def _process_asset(
         per_mesh_shader_index = []
 
         for primitive_idx, primitive in enumerate(mesh.primitives):
-            shader_name = f'{mesh_name}-{primitive_idx}'
-            per_mesh_shader_index.append(shader_name)
+            shader_base_name = f'{mesh_name}-{primitive_idx}'
 
-            per_primitive_shaders = [
-                ShaderType(out_dir, shader_name)
-                for ShaderType in [
-                    _hlsl.VertexShader, _hlsl.PixelShader, _glsl.FragmentShader
-                ]
-            ]
+            per_primitive_shader_list = []
+            per_primitive_shader_index = dict()
 
-            if not skip_codegen:
-                material = gltf_asset.materials[primitive.material]
-                for shader in per_primitive_shaders:
-                    shader.generate(
-                        material,
-                        primitive
-                    )
-            per_asset_shaders += per_primitive_shaders
+            dx_vs = _hlsl.VertexShader(out_dir, shader_base_name)
+            dx_ps = _hlsl.PixelShader(out_dir, shader_base_name)
+
+            per_primitive_shader_list += [dx_vs, dx_ps]
+
+            per_primitive_shader_index['dx'] = {
+                'vs': dx_vs.bin_path.name,
+                'ps': dx_ps.bin_path.name
+            }
+
+            vk_frag = _glsl.FragmentShader(out_dir, shader_base_name)
+            per_primitive_shader_list.append(vk_frag)
+            per_primitive_shader_index['vk'] = { 'frag' : vk_frag.bin_path.name }
+
+            material = gltf_asset.materials[primitive.material]
+            for shader in per_primitive_shader_list:
+                shader.generate(
+                    material,
+                    primitive
+                )
+            per_asset_shader_list += per_primitive_shader_list
+            per_mesh_shader_index.append(per_primitive_shader_index)
 
         per_asset_shader_index.append(per_mesh_shader_index)
         shader_index_file_path = (
@@ -96,15 +103,13 @@ def _process_asset(
     log, sys.stdout = sys.stdout, log
     return _AssetResult(
         log = log.getvalue(),
-        shaders = per_asset_shaders
+        shaders = per_asset_shader_list
     )
 
 def generate(
     gltf_dir_path : Path,
     out_dir_path : Path,
     compile : bool,
-    to_glsl : bool,
-    skip_codegen : bool,
     serial : bool,
     ref_differ : RefDiffer
 ):
@@ -117,8 +122,7 @@ def generate(
 
     process_asset_partial = functools.partial(
         _process_asset,
-        out_dir = out_dir_path,
-        skip_codegen = skip_codegen
+        out_dir = out_dir_path
     )
     gltf_files_glob = gltf_dir_path.glob('**/*.gltf')
 
@@ -141,18 +145,11 @@ def generate(
         dxc.identify()
         glslang.identify()
 
-        if to_glsl:
-            glslc.identify()
-            spirv_cross.identify()
-
         num_failed = 0
 
         if serial:
             for shader in shaders:
-                result = shader.compile(
-                    to_glsl = to_glsl,
-                    ref_differ = ref_differ
-        )
+                result = shader.compile(ref_differ = ref_differ)
                 if not result.success:
                     num_failed += 1
                 print(result.log, end = '')
@@ -161,7 +158,6 @@ def generate(
                 for result in pool.imap_unordered(
                     functools.partial(
                         _compile_shader,
-                        to_glsl = to_glsl,
                         ref_differ = ref_differ
                     ),
                     shaders
@@ -192,17 +188,6 @@ if __name__ == "__main__":
         help = "Compile the generated shaders with DXC (has to be in PATH)"
     )
     parser.add_argument(
-        "--to-glsl",
-        action = 'store_true',
-        help = "Cross-compile to GLSL with SPIRV-Cross"
-    )
-    parser.add_argument(
-        "--skip-codegen",
-        action = 'store_true',
-        help = "Assume that sources have been generated and proceed to "
-               "compilation."
-    )
-    parser.add_argument(
         "--serial",
         action = 'store_true',
         help = "Disable parallelization to facilitate debugging."
@@ -213,8 +198,6 @@ if __name__ == "__main__":
         gltf_dir_path = Path(args.gltf_dir),
         out_dir_path = Path(args.out_dir),
         compile = args.compile,
-        to_glsl = args.to_glsl,
-        skip_codegen = args.skip_codegen,
         serial = args.serial,
         ref_differ = RefDiffer(Path(args.ref_dir)) if args.ref_dir else None
     )

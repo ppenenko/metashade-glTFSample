@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--gltf-dir", "${workspaceFolder}/glTFSample/media/Cauldron-Media",
-                "--out-dir", "${workspaceFolder}/glTFSample/build/DX12/metashade-out"
+                "--out-dir", "${workspaceFolder}/tests/ref/content"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/metashade"
@@ -26,25 +26,8 @@
             "console": "integratedTerminal",
             "args": [
                 "--gltf-dir", "${workspaceFolder}/glTFSample/media/Cauldron-Media",
-                "--out-dir", "${workspaceFolder}/glTFSample/build/DX12/metashade-out",
+                "--out-dir", "${workspaceFolder}/tests/ref/content",
                 "--compile"
-            ],
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/metashade"
-            }
-        },
-        {
-            "name": "Cross-compile to GLSL",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/generate.py",
-            "console": "integratedTerminal",
-            "args": [
-                "--gltf-dir", "${workspaceFolder}/glTFSample/media/Cauldron-Media",
-                "--out-dir", "${workspaceFolder}/glTFSample/build/DX12/metashade-out",
-                "--skip-codegen",
-                "--compile",
-                "--to-glsl"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/metashade"

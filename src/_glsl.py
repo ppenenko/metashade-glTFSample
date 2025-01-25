@@ -12,36 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 from pathlib import Path
 from metashade.glsl.util import glslang
 import _shader_base, _impl
 import subprocess
 
-class Shader(_shader_base.Shader):
-    def _compile(self, to_glsl : bool) -> bool:
+class Shader(_shader_base.Shader, abc.ABC):
+    @staticmethod
+    @abc.abstractmethod
+    def _get_stage_name() -> str:
+        pass
+
+    def _generate_src_path(self, out_dir : Path, shader_name : str) -> Path:
+        return out_dir / f'{shader_name}-{self._get_stage_name()}.glsl'
+
+    def _generate_bin_path(self, out_dir : Path, shader_name : str) -> Path:
+        return out_dir / f'{shader_name}-{self._get_stage_name()}.spv'
+
+    def _compile(self) -> bool:
         try:
-            glsl_output_path = Path(self._file_path).with_suffix('.spv')
             glslang.compile(
-                src_path = self._file_path,
+                src_path = self.src_path,
                 target_env = 'vulkan1.1',
-                shader_stage = 'frag',
-                output_path = glsl_output_path
+                shader_stage = self._get_stage_name(),
+                output_path = self.bin_path
             )
             return True
         except subprocess.CalledProcessError as err:
             return False
     
 class FragmentShader(Shader):
-    def __init__(
-        self,
-        out_dir : Path,
-        shader_name : str
-    ):
-        super().__init__(out_dir, shader_name, 'frag.glsl')
-
     @staticmethod
-    def _get_glslc_stage():
-        return 'fragment'
+    def _get_stage_name() -> str:
+        return 'frag'
 
     def _generate(self, shader_file, material, primitive):
         _impl.generate_frag(shader_file, material, primitive)

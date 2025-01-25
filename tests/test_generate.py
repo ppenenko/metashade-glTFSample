@@ -55,8 +55,6 @@ class TestGenerate:
             gltf_dir_path = gltf_dir_path,
             out_dir_path = self._out_dir,
             compile = True,
-            to_glsl = False,
-            skip_codegen = False,
             serial = False,
             ref_differ = self._ref_differ
         )
