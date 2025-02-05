@@ -12,7 +12,8 @@
             "console": "integratedTerminal",
             "args": [
                 "--gltf-dir", "${workspaceFolder}/glTFSample/media/Cauldron-Media",
-                "--out-dir", "${workspaceFolder}/tests/ref/content"
+                "--out-dir", "${workspaceFolder}/tests/ref/content",
+                "--serial"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/metashade"

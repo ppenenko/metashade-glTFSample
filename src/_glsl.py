@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import abc
+import abc, subprocess
 from pathlib import Path
+
 from metashade.glsl.util import glslang
-import _shader_base, _impl
-import subprocess
+
+import _shader_base
+import _impl.ps as impl_ps
 
 class Shader(_shader_base.Shader, abc.ABC):
     @staticmethod
@@ -48,4 +50,4 @@ class FragmentShader(Shader):
         return 'frag'
 
     def _generate(self, shader_file, material, primitive):
-        _impl.generate_frag(shader_file, material, primitive)
+        impl_ps.generate_frag(shader_file, material, primitive)

@@ -15,7 +15,11 @@
 import abc
 from pathlib import Path
 import subprocess
-import _shader_base, _impl
+import _shader_base
+import _impl.vs as impl_vs
+import _impl.ps as impl_ps
+import _impl.common as common
+
 from metashade.hlsl.util import dxc
 from metashade.glsl.util import glslc
 from metashade.util import spirv_cross
@@ -41,7 +45,7 @@ class Shader(_shader_base.Shader):
         try:
             dxc.compile(
                 src_path = self.src_path,
-                entry_point_name = _impl.entry_point_name,
+                entry_point_name = common.entry_point_name,
                 profile = self._get_hlsl_profile(),
                 to_spirv = False,
                 o0 = False,
@@ -61,7 +65,7 @@ class VertexShader(Shader):
         return 'VS'
 
     def _generate(self, shader_file, material, primitive):
-        _impl.generate_vs(shader_file, primitive)
+        impl_vs.generate(shader_file, primitive)
 
 class PixelShader(Shader):
     @staticmethod
@@ -73,7 +77,7 @@ class PixelShader(Shader):
         return 'PS'
 
     def _generate(self, shader_file, material, primitive):
-        _impl.generate_ps(
+        impl_ps.generate_ps(
             shader_file,
             material,
             primitive

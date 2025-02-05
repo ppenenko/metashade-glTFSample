@@ -14,144 +14,11 @@
 
 import math
 from typing import Any, NamedTuple
-from metashade.hlsl.sm6 import ps_6_0, vs_6_0
+
+from metashade.hlsl.sm6 import ps_6_0
 from metashade.glsl import frag
 
-entry_point_name = 'main'
-
-def _generate_vs_out(sh, primitive):
-    with sh.vs_output('VsOut') as VsOut:
-        VsOut.SV_Position('Pclip', sh.Vector4f)
-        
-        VsOut.texCoord('Pw', sh.Point3f)
-        VsOut.texCoord('Nw', sh.Vector3f)
-
-        if primitive.attributes.TANGENT is not None:
-            VsOut.texCoord('Tw', sh.Vector3f)
-            VsOut.texCoord('Bw', sh.Vector3f)
-
-        VsOut.texCoord('uv0', sh.Point2f)
-
-        if primitive.attributes.COLOR_0 is not None:
-            VsOut.color('rgbaColor0', sh.RgbaF)
-
-def _generate_per_frame_uniform_buffer(sh):
-    sh.struct('Light')(
-        VpXf = sh.Matrix4x4f,
-        ViewXf = sh.Matrix4x4f,
-        v3DirectionW = sh.Vector3f,
-        fRange = sh.Float,
-        rgbColor = sh.RgbF,
-        fIntensity = sh.Float,
-        Pw = sh.Point3f,
-        fInnerConeCos = sh.Float,
-        fOuterConeCos = sh.Float,
-        type_ = sh.Float, # should be an int, but we assume a spotlight anyway
-        fDepthBias = sh.Float,
-        iShadowMap = sh.Float # should be an int, unused for now
-    )
-
-    with sh.uniform_buffer(dx_register = 0, name = 'cbPerFrame'):
-        sh.uniform('g_VpXf', sh.Matrix4x4f)
-        sh.uniform('g_prevVpXf', sh.Matrix4x4f)
-        sh.uniform('g_VpIXf', sh.Matrix4x4f)
-        sh.uniform('g_cameraPw', sh.Point3f)
-        sh.uniform('g_cameraPw_fPadding', sh.Float)
-        sh.uniform('g_fIblFactor', sh.Float)
-        sh.uniform('g_fPerFrameEmissiveFactor', sh.Float)
-        sh.uniform('g_fInvScreenResolution', sh.Float2)
-        sh.uniform('g_f4WireframeOptions', sh.Float4)
-        sh.uniform('g_f2MCameraCurrJitter', sh.Float2)
-        sh.uniform('g_f2MCameraPrevJitter', sh.Float2)
-
-        # should be an array
-        for light_idx in range(0, 80):
-            sh.uniform(f'g_light{light_idx}', sh.Light)
-
-        sh.uniform('g_nLights', sh.Float)   # should be int
-        sh.uniform('g_lodBias', sh.Float)
-
-def _generate_per_object_uniform_buffer(sh, is_ps : bool):
-    if is_ps:
-        sh.struct('PbrFactors')(
-            rgbaEmissive = sh.RgbaF,
-
-            # pbrMetallicRoughness
-            rgbaBaseColor = sh.RgbaF,
-            fMetallic = sh.Float,
-            fRoughness = sh.Float,
-
-            f2Padding = sh.Float2,
-
-            # KHR_materials_pbrSpecularGlossiness
-            rgbaDiffuse = sh.RgbaF,
-            rgbSpecular = sh.RgbF,
-            fGlossiness = sh.Float
-        )
-
-    with sh.uniform_buffer(dx_register = 1, name = 'cbPerObject'):
-        sh.uniform('g_WorldXf', sh.Matrix3x4f)
-        sh.uniform('g_prevWorldXf', sh.Matrix3x4f)
-        if is_ps:
-            sh.uniform('g_perObjectPbrFactors', sh.PbrFactors)
-
-def generate_vs(vs_file, primitive):
-    sh = vs_6_0.Generator(
-        vs_file,
-        # the host app supplies transposed matrix uniforms
-        matrix_post_multiplication = True
-    )
-
-    _generate_per_frame_uniform_buffer(sh)
-    _generate_per_object_uniform_buffer(sh, is_ps = False)
-
-    attributes = primitive.attributes
-
-    with sh.vs_input('VsIn') as VsIn:
-        if attributes.POSITION is None:
-            raise RuntimeError('POSITION attribute is mandatory')
-        VsIn.position('Pobj', sh.Point3f)
-
-        if attributes.NORMAL is not None:
-            VsIn.normal('Nobj', sh.Vector3f)
-
-        if attributes.TANGENT is not None:
-            VsIn.tangent('Tobj', sh.Vector4f)
-
-        if attributes.TEXCOORD_0 is not None:
-            VsIn.texCoord('uv0', sh.Point2f)
-
-        if attributes.TEXCOORD_1 is not None:
-            VsIn.texCoord('uv1', sh.Point2f)
-
-        if attributes.COLOR_0 is not None:
-            VsIn.color('rgbaColor0', sh.RgbaF)
-
-        if attributes.JOINTS_0 is not None:
-            raise RuntimeError('Unsupported attribute JOINTS_0')
-
-        if attributes.WEIGHTS_0 is not None:
-            raise RuntimeError('Unsupported attribute WEIGHTS_0')
-
-    _generate_vs_out(sh, primitive)
-
-    with sh.entry_point(entry_point_name, sh.VsOut)(vsIn = sh.VsIn):
-        sh.Pw = sh.g_WorldXf.xform(sh.vsIn.Pobj)
-        sh.vsOut = sh.VsOut()
-        sh.vsOut.Pclip = sh.g_VpXf.xform(sh.Pw)
-        sh.vsOut.Pw = sh.Pw.xyz
-        sh.vsOut.Nw = sh.g_WorldXf.xform(sh.vsIn.Nobj).xyz.normalize()
-        
-        if hasattr(sh.vsIn, 'Tobj'):
-            sh.vsOut.Tw = sh.g_WorldXf.xform(sh.vsIn.Tobj.xyz).xyz.normalize()
-            sh.vsOut.Bw = sh.vsOut.Nw.cross(sh.vsOut.Tw) * sh.vsIn.Tobj.w
-
-        # Simple passthrough for these attributes
-        for attr_name in ('uv0', 'uv1', 'rgbaColor0'):
-            if hasattr(sh.vsIn, attr_name):
-                setattr(sh.vsOut, attr_name, getattr(sh.vsIn, attr_name))
-
-        sh.return_(sh.vsOut)
+from . import common
 
 def generate_ps(ps_file, material, primitive):
     sh = ps_6_0.Generator(
@@ -160,10 +27,10 @@ def generate_ps(ps_file, material, primitive):
         matrix_post_multiplication = True
     )
 
-    _generate_per_frame_uniform_buffer(sh)
-    _generate_per_object_uniform_buffer(sh, is_ps = True)
+    common.generate_per_frame_uniform_buffer(sh)
+    common.generate_per_object_uniform_buffer(sh, is_ps = True)
 
-    _generate_vs_out(sh, primitive)
+    common.generate_vs_out(sh, primitive)
 
     with sh.ps_output('PsOut') as PsOut:
         PsOut.SV_Target('rgbaColor', sh.RgbaF)
@@ -536,7 +403,7 @@ def generate_ps(ps_file, material, primitive):
         sh.return_(sh.Nw)
 
     # Finally, the pixel shader entry point
-    with sh.entry_point(entry_point_name, sh.PsOut)(psIn = sh.VsOut):
+    with sh.entry_point(common.entry_point_name, sh.PsOut)(psIn = sh.VsOut):
         sh.Vw = (sh.g_cameraPw - sh.psIn.Pw).normalize()
         sh.Nw = sh.getNormal(psIn = sh.psIn)
         
