@@ -41,9 +41,9 @@ def generate_per_frame_uniform_buffer(sh):
         Pw = sh.Point3f,
         fInnerConeCos = sh.Float,
         fOuterConeCos = sh.Float,
-        type_ = sh.Float, # should be an int, but we assume a spotlight anyway
+        type_ = sh.Int, # unused, we assume a spotlight anyway
         fDepthBias = sh.Float,
-        iShadowMap = sh.Float # should be an int, unused for now
+        iShadowMap = sh.Int
     )
 
     with sh.uniform_buffer(dx_register = 0, name = 'cbPerFrame'):
@@ -63,7 +63,7 @@ def generate_per_frame_uniform_buffer(sh):
         for light_idx in range(0, 80):
             sh.uniform(f'g_light{light_idx}', sh.Light)
 
-        sh.uniform('g_nLights', sh.Float)   # should be int
+        sh.uniform('g_nLights', sh.Int)
         sh.uniform('g_lodBias', sh.Float)
 
 def generate_per_object_uniform_buffer(sh, is_ps : bool):
