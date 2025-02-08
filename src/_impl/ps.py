@@ -18,7 +18,7 @@ from typing import Any, NamedTuple
 from metashade.hlsl.sm6 import ps_6_0
 from metashade.glsl import frag
 
-from . import common
+from . import common, _uniforms
 
 def generate_ps(ps_file, material, primitive):
     sh = ps_6_0.Generator(
@@ -27,9 +27,7 @@ def generate_ps(ps_file, material, primitive):
         matrix_post_multiplication = True
     )
 
-    common.generate_per_frame_uniform_buffer(sh)
-    common.generate_per_object_uniform_buffer(sh, is_ps = True)
-
+    _uniforms.generate(sh, for_ps = True)
     common.generate_vs_out(sh, primitive)
 
     with sh.ps_output('PsOut') as PsOut:

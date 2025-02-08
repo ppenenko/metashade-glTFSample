@@ -15,7 +15,7 @@
 from typing import Any
 from metashade.hlsl.sm6 import vs_6_0
 
-from . import common
+from . import common, _uniforms
 
 def generate(vs_file, primitive):
     sh = vs_6_0.Generator(
@@ -24,8 +24,7 @@ def generate(vs_file, primitive):
         matrix_post_multiplication = True
     )
 
-    common.generate_per_frame_uniform_buffer(sh)
-    common.generate_per_object_uniform_buffer(sh, is_ps = False)
+    _uniforms.generate(sh, for_ps = False)
 
     attributes = primitive.attributes
 
