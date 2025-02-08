@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 from typing import Any, NamedTuple
 
 from metashade.hlsl.sm6 import ps_6_0
 from metashade.glsl import frag
 
-from . import common, _uniforms
+from . import common, _pbr_surf_lib, _uniforms
 
 def generate_ps(ps_file, material, primitive):
     sh = ps_6_0.Generator(
@@ -32,6 +31,8 @@ def generate_ps(ps_file, material, primitive):
 
     with sh.ps_output('PsOut') as PsOut:
         PsOut.SV_Target('rgbaColor', sh.RgbaF)
+
+    _pbr_surf_lib.generate(sh)
 
     # Generating texture bindings
     class _MaterialTexture(NamedTuple):
@@ -150,13 +151,6 @@ def generate_ps(ps_file, material, primitive):
         # Return a reference to the local variable
         return getattr(sh, sample_var_name)
 
-    sh.struct('PbrParams')(
-        rgbDiffuse = sh.RgbF,
-        rgbF0 = sh.RgbF,
-        fPerceptualRoughness = sh.Float,
-        fOpacity = sh.Float
-    )
-
     with sh.function('metallicRoughness', sh.PbrParams)(psIn = sh.VsOut):
         sh.rgbaBaseColor = (sh.g_sBaseColor @ sh.g_tBaseColor)(
             sh.psIn.uv0, lod_bias = sh.g_lodBias
@@ -194,83 +188,6 @@ def generate_ps(ps_file, material, primitive):
         sh.pbrParams.fPerceptualRoughness = sh.fPerceptualRoughness.saturate()
         sh.pbrParams.fOpacity = sh.rgbaBaseColor.a
         sh.return_(sh.pbrParams)
-
-    sh // "https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)"
-    sh // ""
-    with sh.function('D_Ggx', sh.Float)(
-        NdotH = sh.Float, fAlphaRoughness = sh.Float
-    ):
-        sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
-        sh.fF = (sh.NdotH * sh.fASqr - sh.NdotH) * sh.NdotH + sh.Float(1.0)
-        sh.return_(
-            (sh.fASqr / (sh.Float(math.pi) * sh.fF * sh.fF )).saturate()
-        )
-
-    with sh.function('F_Schlick', sh.RgbF)(LdotH = sh.Float, rgbF0 = sh.RgbF):
-        sh.return_(
-            sh.rgbF0 + (sh.RgbF(1.0) - sh.rgbF0)
-                * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
-        )
-
-    sh // "https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)"
-    sh // ""
-    with sh.function('V_SmithGgxCorrelated', sh.Float)(
-        NdotV = sh.Float, NdotL = sh.Float, fAlphaRoughness = sh.Float
-    ):
-        sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
-        sh.fGgxL = sh.NdotV * (
-            (sh.NdotL - sh.NdotL * sh.fASqr) * sh.NdotL + sh.fASqr
-        ).sqrt()
-        sh.fGgxV = sh.NdotL * (
-            (sh.NdotV - sh.NdotV * sh.fASqr) * sh.NdotV + sh.fASqr
-        ).sqrt()
-        sh.fV = sh.Float(0.5) / (sh.fGgxL + sh.fGgxV)
-        sh.return_(sh.fV.saturate())
-
-    with sh.function('Fd_Lambert', sh.Float)():
-        sh.return_( sh.Float( 1.0 / math.pi ) )
-
-    with sh.function('pbrBrdf', sh.RgbF)(
-        L = sh.Vector3f, N = sh.Vector3f, V = sh.Vector3f,
-        pbrParams = sh.PbrParams
-    ):
-        sh.NdotV = (sh.N @ sh.V).abs()
-        sh.NdotL = (sh.N @ sh.L).saturate()
-
-        sh.H = (sh.V + sh.L).normalize()
-        sh.NdotH = (sh.N @ sh.H).saturate()
-        sh.LdotH = (sh.L @ sh.H).saturate()
-
-        sh.fAlphaRoughness = ( sh.pbrParams.fPerceptualRoughness
-            * sh.pbrParams.fPerceptualRoughness
-        )
-
-        sh.fD = sh.D_Ggx(
-            NdotH = sh.NdotH,
-            fAlphaRoughness = sh.fAlphaRoughness
-        )
-        sh.rgbF = sh.F_Schlick(
-            LdotH = sh.LdotH, rgbF0 = sh.pbrParams.rgbF0
-        )
-        sh.fV = sh.V_SmithGgxCorrelated(
-            NdotV = sh.NdotV,
-            NdotL = sh.NdotL,
-            fAlphaRoughness = sh.fAlphaRoughness
-        )
-
-        sh.rgbFr = (sh.fD * sh.fV) * sh.rgbF
-        sh.rgbFd = sh.pbrParams.rgbDiffuse * sh.Fd_Lambert()
-        
-        sh.return_(sh.NdotL * (sh.rgbFr + sh.rgbFd))
-
-    with sh.function('getRangeAttenuation', sh.Float)(
-        light = sh.Light, d = sh.Float
-    ):
-        # https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
-        # TODO: handle undefined/unlimited ranges
-        sh.return_(
-            (sh.d / sh.light.fRange).lerp(sh.Float(1), sh.Float(0)).saturate()
-        )
 
     with sh.function('getPcfShadow', sh.Float)(
         uv = sh.Float2,
