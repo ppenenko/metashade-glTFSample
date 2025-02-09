@@ -37,17 +37,17 @@ class Shader(abc.ABC):
     def _generate_bin_path(self, out_dir : Path, shader_name : str) -> Path:
         pass
 
-    @abc.abstractmethod
-    def _generate(self, shader_file, material, primitive):
-        pass
+    # @abc.abstractmethod
+    # def _generate_deferred(self):
+    #     pass
 
-    def generate(self, material, primitive):
+    def _generate_wrapped(self, generate_func):
         with perf.TimedScope(f'Generating {self.src_path} ', 'Done'), \
             open(self.src_path, 'w') as shader_file:
             #
-            self._generate(shader_file, material, primitive)
+            generate_func(shader_file)
 
-    class CompileResult(NamedTuple):
+    class GenerateAndCompileResult(NamedTuple):
         log : str
         success : bool
 
@@ -55,7 +55,9 @@ class Shader(abc.ABC):
     def _compile(self) -> bool:
         pass
 
-    def compile(self, ref_differ : RefDiffer) -> CompileResult:
+    def generate_and_compile(
+        self, ref_differ : RefDiffer
+    ) -> GenerateAndCompileResult:
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
 
@@ -65,4 +67,4 @@ class Shader(abc.ABC):
         success = self._compile()
 
         log, sys.stdout = sys.stdout, log
-        return Shader.CompileResult(log.getvalue(), success)
+        return Shader.GenerateAndCompileResult(log.getvalue(), success)

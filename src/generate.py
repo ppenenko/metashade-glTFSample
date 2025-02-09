@@ -18,22 +18,23 @@ import multiprocessing as mp
 from typing import List, NamedTuple
 from pygltflib import GLTF2
 
-from metashade.util import perf, spirv_cross
+from metashade.util import perf
 from metashade.hlsl.util import dxc
-from metashade.glsl.util import glslang, glslc
+from metashade.glsl.util import glslang
 from metashade.util.tests import RefDiffer
 
 import _shader_base, _hlsl, _glsl
+from _impl.vertex_data import VertexData
 
-def _compile_shader(
+def _generate_and_compile(
     shader,
     ref_differ : RefDiffer
-) -> _shader_base.Shader.CompileResult:
+) -> _shader_base.Shader.GenerateAndCompileResult:
     '''
     Helper function to compile a shader in a process pool.
     Without it, the pool would not be able to pickle the method.
     '''
-    return shader.compile(ref_differ)
+    return shader.generate_and_compile(ref_differ)
 
 class _AssetResult(NamedTuple):
     log : io.StringIO
@@ -65,8 +66,19 @@ def _process_asset(
             per_primitive_shader_list = []
             per_primitive_shader_index = dict()
 
-            dx_vs = _hlsl.VertexShader(out_dir, shader_base_name)
-            dx_ps = _hlsl.PixelShader(out_dir, shader_base_name)
+            material = gltf_asset.materials[primitive.material]
+
+            vertex_data = VertexData(primitive)
+
+            dx_vs = _hlsl.VertexShader(
+                out_dir, shader_base_name,
+                vertex_data
+            )
+            dx_ps = _hlsl.PixelShader(
+                out_dir, shader_base_name,
+                material,
+                vertex_data
+            )
 
             per_primitive_shader_list += [dx_vs, dx_ps]
 
@@ -79,12 +91,6 @@ def _process_asset(
             per_primitive_shader_list.append(vk_frag)
             per_primitive_shader_index['vk'] = { 'frag' : vk_frag.bin_path.name }
 
-            material = gltf_asset.materials[primitive.material]
-            for shader in per_primitive_shader_list:
-                shader.generate(
-                    material,
-                    primitive
-                )
             per_asset_shader_list += per_primitive_shader_list
             per_mesh_shader_index.append(per_primitive_shader_index)
 
@@ -149,7 +155,7 @@ def generate(
 
         if serial:
             for shader in shaders:
-                result = shader.compile(ref_differ = ref_differ)
+                result = shader.generate_and_compile(ref_differ = ref_differ)
                 if not result.success:
                     num_failed += 1
                 print(result.log, end = '')
@@ -157,7 +163,7 @@ def generate(
             with mp.Pool() as pool:
                 for result in pool.imap_unordered(
                     functools.partial(
-                        _compile_shader,
+                        _generate_and_compile,
                         ref_differ = ref_differ
                     ),
                     shaders

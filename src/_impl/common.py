@@ -13,19 +13,3 @@
 # limitations under the License.
 
 entry_point_name = 'main'
-
-def generate_vs_out(sh, primitive):
-    with sh.vs_output('VsOut') as VsOut:
-        VsOut.SV_Position('Pclip', sh.Vector4f)
-        
-        VsOut.texCoord('Pw', sh.Point3f)
-        VsOut.texCoord('Nw', sh.Vector3f)
-
-        if primitive.attributes.TANGENT is not None:
-            VsOut.texCoord('Tw', sh.Vector3f)
-            VsOut.texCoord('Bw', sh.Vector3f)
-
-        VsOut.texCoord('uv0', sh.Point2f)
-
-        if primitive.attributes.COLOR_0 is not None:
-            VsOut.color('rgbaColor0', sh.RgbaF)

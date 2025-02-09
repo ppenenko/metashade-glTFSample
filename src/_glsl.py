@@ -43,11 +43,12 @@ class Shader(_shader_base.Shader, abc.ABC):
             return True
         except subprocess.CalledProcessError as err:
             return False
-    
+
 class FragmentShader(Shader):
+    def __init__(self, out_dir, shader_name):
+        super().__init__(out_dir, shader_name)
+        self._generate_wrapped(impl_ps.generate_frag)
+
     @staticmethod
     def _get_stage_name() -> str:
         return 'frag'
-
-    def _generate(self, shader_file, material, primitive):
-        impl_ps.generate_frag(shader_file, material, primitive)

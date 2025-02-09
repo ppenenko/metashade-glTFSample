@@ -19,7 +19,7 @@ from metashade.glsl import frag
 
 from . import common, _pbr_surf_lib, _uniforms
 
-def generate_ps(ps_file, material, primitive):
+def generate_ps(ps_file, material, vertex_data):
     sh = ps_6_0.Generator(
         ps_file,
         # the host app supplies transposed matrix uniforms
@@ -27,7 +27,7 @@ def generate_ps(ps_file, material, primitive):
     )
 
     _uniforms.generate(sh, for_ps = True)
-    common.generate_vs_out(sh, primitive)
+    vertex_data.generate_vs_out(sh)
 
     with sh.ps_output('PsOut') as PsOut:
         PsOut.SV_Target('rgbaColor', sh.RgbaF)
@@ -288,7 +288,7 @@ def generate_ps(ps_file, material, primitive):
 
         normalSample = _sample_material_texture('normal')
         if normalSample is not None:
-            if primitive.attributes.TANGENT is not None:
+            if hasattr(sh.psIn, 'Tw'):
                 sh.tbn = sh.Matrix3x3f(
                     rows = (
                         sh.psIn.Tw.normalize(),
@@ -355,7 +355,7 @@ def generate_ps(ps_file, material, primitive):
 
         sh.return_(sh.psOut)
 
-def generate_frag(frag_file, material, primitive):
+def generate_frag(frag_file):
     sh = frag.Generator(frag_file, '450')
 
     sh.out_f4Color = sh.stage_output(sh.Float4, location = 0)
