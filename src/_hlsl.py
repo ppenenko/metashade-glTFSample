@@ -29,16 +29,11 @@ class Shader(_shader_base.Shader):
     def _get_hlsl_profile() -> str:
         pass
 
-    @staticmethod
-    @abc.abstractmethod
-    def _get_stage_name() -> str:
-        pass
-
     def _generate_src_path(self, out_dir : Path, shader_name : str) -> Path:
-        return out_dir / f'{shader_name}-{self._get_stage_name()}.hlsl'
+        return out_dir / f'{shader_name}.hlsl'
 
     def _generate_bin_path(self, out_dir : Path, shader_name : str) -> Path:
-        return out_dir / f'{shader_name}-{self._get_stage_name()}.cso'
+        return out_dir / f'{shader_name}.cso'
 
     def _compile(self) -> bool:
         try:
@@ -55,37 +50,44 @@ class Shader(_shader_base.Shader):
             return False
 
 class VertexShader(Shader):
-    def __init__(self, out_dir, shader_name, vertex_data):
-        super().__init__(out_dir, shader_name)
+    def __init__(self, out_dir, vertex_data):
+        self._vertex_data = vertex_data
+        shader_name = 'GltfPbr'
+        vd_id = vertex_data.get_id()
+        if vd_id != '':
+            shader_name += f'-{vd_id}'
+        shader_name += '-VS'
 
-        def generate(shader_file):
-            vertex_data.generate_vs(shader_file)
-        self._generate_wrapped(generate)
+        super().__init__(out_dir, shader_name)
 
     @staticmethod
     def _get_hlsl_profile() -> str:
         return 'vs_6_0'
     
-    @staticmethod
-    def _get_stage_name() -> str:
-        return 'VS'
+    def _generate_deferred(self):
+        def generate(shader_file):
+            self._vertex_data.generate_vs(shader_file)
+        self._generate_wrapped(generate)
 
 class PixelShader(Shader):
-    def __init__(self, out_dir, shader_name, material, primitive):
+    def __init__(self, out_dir, primitive_id, material, vertex_data):
+        self._vertex_data = vertex_data
+        shader_name = f'{primitive_id}-PS'
         super().__init__(out_dir, shader_name)
 
         def generate(shader_file):
             impl_ps.generate_ps(
                 shader_file,
                 material,
-                primitive
+                self._vertex_data
             )
         self._generate_wrapped(generate)
+
+    def _generate_deferred(self):
+        # Do nothing, because we generate the shader in the constructor for
+        # now, before generation is decoupled from glTF parsing
+        pass
 
     @staticmethod
     def _get_hlsl_profile():
         return 'ps_6_0'
-    
-    @staticmethod
-    def _get_stage_name() -> str:
-        return 'PS'

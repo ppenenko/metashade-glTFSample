@@ -38,7 +38,7 @@ def _generate_and_compile(
 
 class _AssetResult(NamedTuple):
     log : io.StringIO
-    shaders : List[_shader_base.Shader]
+    shader_dict : List[_shader_base.Shader]
 
 def _process_asset(
     gltf_file_path : str,
@@ -47,8 +47,8 @@ def _process_asset(
     log = io.StringIO()
     log, sys.stdout = sys.stdout, log
 
-    per_asset_shader_list = []  # List of shaders to compile by this script
-    per_asset_shader_index = [] # Dictionary of shaders per mesh and primitive
+    shader_dict = dict()    # Dictionary of shaders to compile by this script
+    shader_index = []       # Dictionary of shaders per mesh and primitive
 
     with perf.TimedScope(f'Loading glTF asset {gltf_file_path} '):
         gltf_asset = GLTF2().load(gltf_file_path)
@@ -61,46 +61,45 @@ def _process_asset(
         per_mesh_shader_index = []
 
         for primitive_idx, primitive in enumerate(mesh.primitives):
-            shader_base_name = f'{mesh_name}-{primitive_idx}'
-
-            per_primitive_shader_list = []
             per_primitive_shader_index = dict()
 
             material = gltf_asset.materials[primitive.material]
-
             vertex_data = VertexData(primitive)
 
-            dx_vs = _hlsl.VertexShader(
-                out_dir, shader_base_name,
-                vertex_data
-            )
+            dx_vs = _hlsl.VertexShader(out_dir, vertex_data)
             dx_ps = _hlsl.PixelShader(
-                out_dir, shader_base_name,
-                material,
-                vertex_data
+                out_dir = out_dir,
+                primitive_id = f'{mesh_name}-{primitive_idx}',
+                material = material,
+                vertex_data = vertex_data
             )
-
-            per_primitive_shader_list += [dx_vs, dx_ps]
 
             per_primitive_shader_index['dx'] = {
-                'vs': dx_vs.bin_path.name,
-                'ps': dx_ps.bin_path.name
+                'vs': dx_vs.get_id(),
+                'ps': dx_ps.get_id(),
             }
 
-            vk_frag = _glsl.FragmentShader(out_dir, shader_base_name)
-            per_primitive_shader_list.append(vk_frag)
-            per_primitive_shader_index['vk'] = { 'frag' : vk_frag.bin_path.name }
+            vk_frag = _glsl.FragmentShader(out_dir)
+            per_primitive_shader_index['vk'] = { 'frag' : vk_frag.get_id() }
 
-            per_asset_shader_list += per_primitive_shader_list
+            if dx_ps.get_id() in shader_dict:
+                raise RuntimeError(
+                    'Unexpected: shaders sharing the same ID: '
+                    f'{dx_ps.get_id()}'
+                )
+
+            for shader in (dx_vs, dx_ps, vk_frag):
+                shader_dict[shader.get_id()] = shader
+
             per_mesh_shader_index.append(per_primitive_shader_index)
 
-        per_asset_shader_index.append(per_mesh_shader_index)
+        shader_index.append(per_mesh_shader_index)
         shader_index_file_path = (
             out_dir / gltf_file_path.with_suffix('.json').name
         )
         with open(shader_index_file_path, 'w') as shader_index_file:
             json.dump(
-                per_asset_shader_index,
+                shader_index,
                 shader_index_file,
                 indent = 4
             )
@@ -109,7 +108,7 @@ def _process_asset(
     log, sys.stdout = sys.stdout, log
     return _AssetResult(
         log = log.getvalue(),
-        shaders = per_asset_shader_list
+        shader_dict = shader_dict
     )
 
 def generate(
@@ -124,7 +123,7 @@ def generate(
 
     os.makedirs(out_dir_path, exist_ok = True)
 
-    shaders = []
+    shader_dict = dict()
 
     process_asset_partial = functools.partial(
         _process_asset,
@@ -136,7 +135,7 @@ def generate(
         for gltf_path in gltf_files_glob:
             asset_result = process_asset_partial(gltf_file_path = gltf_path)
             print(asset_result.log)
-            shaders += asset_result.shaders
+            shader_dict |= asset_result.shader_dict
     else:
         with mp.Pool() as pool:
             for asset_result in pool.imap_unordered(
@@ -144,7 +143,7 @@ def generate(
                 gltf_files_glob
             ):
                 print(asset_result.log)
-                shaders += asset_result.shaders
+                shader_dict |= asset_result.shader_dict
 
     if compile:
         print()
@@ -154,7 +153,7 @@ def generate(
         num_failed = 0
 
         if serial:
-            for shader in shaders:
+            for shader in shader_dict.values():
                 result = shader.generate_and_compile(ref_differ = ref_differ)
                 if not result.success:
                     num_failed += 1
@@ -166,7 +165,7 @@ def generate(
                         _generate_and_compile,
                         ref_differ = ref_differ
                     ),
-                    shaders
+                    shader_dict.values()
                 ):
                     if not result.success:
                         num_failed += 1
@@ -174,11 +173,11 @@ def generate(
 
         if num_failed > 0:
             raise RuntimeError(
-                f'{num_failed} out of {len(shaders)} shaders failed to '
+                f'{num_failed} out of {len(shader_dict)} shaders failed to '
                 'compile - see the log above.'
             )
         else:
-            print(f'\nAll {len(shaders)} shaders compiled successfully.')
+            print(f'\nAll {len(shader_dict)} shaders compiled successfully.')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
