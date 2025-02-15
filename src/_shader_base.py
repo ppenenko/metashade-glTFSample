@@ -41,7 +41,7 @@ class Shader(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _generate_deferred(self):
+    def _generate(self):
         pass
 
     def _generate_wrapped(self, generate_func):
@@ -64,7 +64,7 @@ class Shader(abc.ABC):
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
 
-        self._generate_deferred()
+        self._generate()
 
         if ref_differ is not None:
             ref_differ(self.src_path)

@@ -43,7 +43,7 @@ class FragmentShader(Shader):
     def __init__(self, out_dir):
         super().__init__(out_dir, 'GLTFPbrPass-frag')
 
-    def _generate_deferred(self):
+    def _generate(self):
         self._generate_wrapped(impl_ps.generate_frag)
 
     @staticmethod

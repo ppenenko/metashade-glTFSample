@@ -64,32 +64,25 @@ class VertexShader(Shader):
     def _get_hlsl_profile() -> str:
         return 'vs_6_0'
     
-    def _generate_deferred(self):
+    def _generate(self):
         def generate(shader_file):
             self._vertex_data.generate_vs(shader_file)
         self._generate_wrapped(generate)
 
 class PixelShader(Shader):
     def __init__(self, out_dir, primitive_id, material, vertex_data):
-        self._vertex_data = vertex_data
-        self._material_textures = MaterialTextures(material)
-
+        self._ps_impl = impl_ps.ps(
+            material = material,
+            vertex_data = vertex_data
+        )
+        
         shader_name = f'{primitive_id}-PS'
         super().__init__(out_dir, shader_name)
 
+    def _generate(self):
         def generate(shader_file):
-            impl_ps.generate_ps(
-                ps_file = shader_file,
-                material = material,
-                vertex_data = self._vertex_data,
-                material_textures = self._material_textures
-            )
-        self._generate_wrapped(generate)
-
-    def _generate_deferred(self):
-        # Do nothing, because we generate the shader in the constructor for
-        # now, before generation is decoupled from glTF parsing
-        pass
+            self._ps_impl.generate(shader_file)
+        self._generate_wrapped(generate) 
 
     @staticmethod
     def _get_hlsl_profile():
