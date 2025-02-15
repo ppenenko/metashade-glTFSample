@@ -17,9 +17,9 @@ from pathlib import Path
 import subprocess
 import _shader_base
 
-from _impl.vertex_data import VertexData
 import _impl.ps as impl_ps
 import _impl.common as common
+from _impl.material_textures import MaterialTextures
 
 from metashade.hlsl.util import dxc
 
@@ -72,14 +72,17 @@ class VertexShader(Shader):
 class PixelShader(Shader):
     def __init__(self, out_dir, primitive_id, material, vertex_data):
         self._vertex_data = vertex_data
+        self._material_textures = MaterialTextures(material)
+
         shader_name = f'{primitive_id}-PS'
         super().__init__(out_dir, shader_name)
 
         def generate(shader_file):
             impl_ps.generate_ps(
-                shader_file,
-                material,
-                self._vertex_data
+                ps_file = shader_file,
+                material = material,
+                vertex_data = self._vertex_data,
+                material_textures = self._material_textures
             )
         self._generate_wrapped(generate)
 

@@ -13,3 +13,9 @@
 # limitations under the License.
 
 entry_point_name = 'main'
+
+def get_texture_uniform_name(name: str) -> str:
+    return 'g_t' + name[0].upper() + name[1:]
+    
+def get_sampler_uniform_name(name: str) -> str:
+    return 'g_s' + name[0].upper() + name[1:]

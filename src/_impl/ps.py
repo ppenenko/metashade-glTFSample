@@ -18,8 +18,15 @@ from metashade.hlsl.sm6 import ps_6_0
 from metashade.glsl import frag
 
 from . import common, _pbr_surf_lib, _uniforms
+from .material_textures import MaterialTextures
+from .vertex_data import VertexData
 
-def generate_ps(ps_file, material, vertex_data):
+def generate_ps(
+    ps_file,
+    material,
+    vertex_data : VertexData,
+    material_textures : MaterialTextures
+):
     sh = ps_6_0.Generator(
         ps_file,
         # the host app supplies transposed matrix uniforms
@@ -33,65 +40,10 @@ def generate_ps(ps_file, material, vertex_data):
         PsOut.SV_Target('rgbaColor', sh.RgbaF)
 
     _pbr_surf_lib.generate(sh)
+    material_textures.generate_uniforms(sh)
 
-    # Generating texture bindings
-    class _MaterialTexture(NamedTuple):
-        gltf_texture : Any
-        texel_type : Any
-
-    material_textures = dict()
-
-    def _def_material_texture(parent, name: str, texel_type = None):
-        gltf_texture = getattr(parent, name + 'Texture')
-        if gltf_texture is not None:
-            material_textures[name] = _MaterialTexture(
-                gltf_texture, texel_type
-            )
-
-    _def_material_texture(material, 'normal', sh.Vector4f)
-    _def_material_texture(material, 'occlusion')
-    _def_material_texture(material, 'emissive', sh.RgbaF)
-
-    if material.pbrMetallicRoughness is not None:
-        _def_material_texture(
-            material.pbrMetallicRoughness, 'baseColor', sh.RgbaF
-        )
-        _def_material_texture(
-            material.pbrMetallicRoughness,
-            'metallicRoughness',
-            sh.RgbaF
-        )
-    elif material.extensions is not None:
-        specularGlossiness = \
-            material.extensions.KHR_materials_pbrSpecularGlossiness
-        if specularGlossiness is not None:
-            _def_material_texture(specularGlossiness, 'diffuse', sh.RgbaF)
-            _def_material_texture(specularGlossiness, 'specularGlossiness')
-            assert False, \
-                ('KHR_materials_pbrSpecularGlossiness is not implemented yet, '
-                'see https://github.com/metashade/metashade/issues/18')
-    
-    def _get_texture_uniform_name(name: str) -> str:
-        return 'g_t' + name[0].upper() + name[1:]
-    
-    def _get_sampler_uniform_name(name: str) -> str:
-        return 'g_s' + name[0].upper() + name[1:]
-
-    # The host app allocates texture and uniform registers for material
-    # textures sorted by name
-    for texture_idx, (texture_name, material_texture) in enumerate(
-        sorted(material_textures.items())
-    ):
-        sh.uniform(
-            _get_texture_uniform_name(texture_name),
-            sh.Texture2d(texel_type = material_texture.texel_type),
-            dx_register = texture_idx
-        )
-        sh.uniform(
-            _get_sampler_uniform_name(texture_name),
-            sh.Sampler,
-            dx_register = texture_idx
-        )
+    # continuing right after the material textures
+    texture_idx = len(material_textures)
 
     # IBL texture/sampler definitions
     for ibl_texture_name, ibl_texture_type in {
@@ -99,57 +51,22 @@ def generate_ps(ps_file, material, vertex_data):
         'iblDiffuse'    : sh.TextureCube(sh.RgbaF),
         'iblSpecular'   : sh.TextureCube(sh.RgbaF)
     }.items():
-        texture_idx += 1    # continuing right after the material textures
         sh.uniform(
-            _get_texture_uniform_name(ibl_texture_name),
+            common.get_texture_uniform_name(ibl_texture_name),
             ibl_texture_type,
             dx_register = texture_idx
         )
         sh.uniform(
-            _get_sampler_uniform_name(ibl_texture_name),
+            common.get_sampler_uniform_name(ibl_texture_name),
             sh.Sampler,
             dx_register = texture_idx
         )
+        texture_idx += 1
 
     # The shadow map registers are hardcoded in the host app
     shadow_map_register = 9
     sh.uniform('g_tShadowMap', sh.Texture2d, dx_register = shadow_map_register)
     sh.uniform('g_sShadowMap', sh.SamplerCmp, dx_register = shadow_map_register)
-
-    def _get_material_uv(texture_name : str):
-        material_texture = material_textures.get(texture_name)
-        if material_texture is None:
-            return None
-
-        uv_set_idx = material_texture.gltf_texture.texCoord
-        if uv_set_idx is None:
-            uv_set_idx = 0
-
-        return getattr(sh.psIn, f'uv{uv_set_idx}')
-
-    def _sample_material_texture(texture_name : str):
-        # Get the UV member of the input structure
-        # corresponding to the glTF texture
-        uv = _get_material_uv(texture_name)
-        if uv is None:
-            # The texture is not used in the material
-            return None
-
-        # Get the texture and sampler uniforms by the glTF texture name
-        texture = getattr(sh, _get_texture_uniform_name(texture_name))
-        sampler = getattr(sh, _get_sampler_uniform_name(texture_name))
-
-        # Generate the expression sampling the texture
-        sample = (sampler @ texture)(uv, lod_bias = sh.g_lodBias)
-
-        # Create a unique variable name for the sample
-        sample_var_name = texture_name + 'Sample'
-
-        # Initialize a local sample variable with the expression
-        setattr(sh, sample_var_name, sample)
-
-        # Return a reference to the local variable
-        return getattr(sh, sample_var_name)
 
     with sh.function('metallicRoughness', sh.PbrParams)(psIn = sh.VsOut):
         sh.rgbaBaseColor = (sh.g_sBaseColor @ sh.g_tBaseColor)(
@@ -169,7 +86,9 @@ def generate_ps(ps_file, material, vertex_data):
         sh.fPerceptualRoughness = sh.g_perObjectPbrFactors.fRoughness
         sh.fMetallic = sh.g_perObjectPbrFactors.fMetallic
 
-        metallicRoughnessSample = _sample_material_texture('metallicRoughness')
+        metallicRoughnessSample = material_textures.sample_texture(
+            sh, 'metallicRoughness'
+        )
         if metallicRoughnessSample is not None:
             sh.fPerceptualRoughness *= metallicRoughnessSample.g
             sh.fMetallic *= metallicRoughnessSample.b
@@ -286,7 +205,7 @@ def generate_ps(ps_file, material, vertex_data):
     with sh.function('getNormal', sh.Vector3f)(psIn = sh.VsOut):
         sh.Nw = sh.psIn.Nw.normalize()
 
-        normalSample = _sample_material_texture('normal')
+        normalSample = material_textures.sample_texture(sh, 'normal')
         if normalSample is not None:
             if hasattr(sh.psIn, 'Tw'):
                 sh.tbn = sh.Matrix3x3f(
@@ -300,7 +219,7 @@ def generate_ps(ps_file, material, vertex_data):
                 sh.PwDx = sh.psIn.Pw.ddx()
                 sh.PwDy = sh.psIn.Pw.ddy()
 
-                uv = _get_material_uv('normal')
+                uv = material_textures.get_uv(sh, 'normal')
                 sh.uvDx = uv.ddx()
                 sh.uvDy = uv.ddy()
 
@@ -341,14 +260,14 @@ def generate_ps(ps_file, material, vertex_data):
             V = sh.Vw
         ) * sh.g_fIblFactor
 
-        aoSample = _sample_material_texture('occlusion')
+        aoSample = material_textures.sample_texture(sh, 'occlusion')
         if aoSample is not None:
             sh.psOut.rgbaColor.rgb *= aoSample.x
 
         sh.rgbEmissive = ( sh.g_perObjectPbrFactors.rgbaEmissive.rgb
             * sh.g_fPerFrameEmissiveFactor
         )
-        emissiveSample = _sample_material_texture('emissive')
+        emissiveSample = material_textures.sample_texture(sh, 'emissive')
         if emissiveSample is not None:
             sh.rgbEmissive *= emissiveSample.rgb
         sh.psOut.rgbaColor.rgb += sh.rgbEmissive
