@@ -53,14 +53,10 @@ def _process_asset(
     with perf.TimedScope(f'Loading glTF asset {gltf_file_path} '):
         gltf_asset = GLTF2().load(gltf_file_path)
 
-    for mesh_idx, mesh in enumerate(gltf_asset.meshes):
-        mesh_name = ( mesh.name if mesh.name is not None
-            else f'UnnamedMesh{mesh_idx}'
-        )
-
+    for mesh in gltf_asset.meshes:
         per_mesh_shader_index = []
 
-        for primitive_idx, primitive in enumerate(mesh.primitives):
+        for primitive in mesh.primitives:
             per_primitive_shader_index = dict()
 
             material = gltf_asset.materials[primitive.material]
@@ -69,7 +65,6 @@ def _process_asset(
             dx_vs = _hlsl.VertexShader(out_dir, vertex_data)
             dx_ps = _hlsl.PixelShader(
                 out_dir = out_dir,
-                primitive_id = f'{mesh_name}-{primitive_idx}',
                 material = material,
                 vertex_data = vertex_data
             )
@@ -82,28 +77,23 @@ def _process_asset(
             vk_frag = _glsl.FragmentShader(out_dir)
             per_primitive_shader_index['vk'] = { 'frag' : vk_frag.get_id() }
 
-            if dx_ps.get_id() in shader_dict:
-                raise RuntimeError(
-                    'Unexpected: shaders sharing the same ID: '
-                    f'{dx_ps.get_id()}'
-                )
-
             for shader in (dx_vs, dx_ps, vk_frag):
                 shader_dict[shader.get_id()] = shader
 
             per_mesh_shader_index.append(per_primitive_shader_index)
 
         shader_index.append(per_mesh_shader_index)
-        shader_index_file_path = (
-            out_dir / gltf_file_path.with_suffix('.json').name
+
+    shader_index_file_path = (
+        out_dir / gltf_file_path.with_suffix('.json').name
+    )
+    with open(shader_index_file_path, 'w') as shader_index_file:
+        json.dump(
+            shader_index,
+            shader_index_file,
+            indent = 4
         )
-        with open(shader_index_file_path, 'w') as shader_index_file:
-            json.dump(
-                shader_index,
-                shader_index_file,
-                indent = 4
-            )
-        print(f'Shader index written to {shader_index_file_path}\n')
+    print(f'Shader index written to {shader_index_file_path}\n')
 
     log, sys.stdout = sys.stdout, log
     return _AssetResult(

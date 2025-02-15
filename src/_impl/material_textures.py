@@ -17,30 +17,45 @@ from . import common
 
 class MaterialTextures:
     class _TextureDef(NamedTuple):
-        gltf_texture : Any
         texel_dtype_name : str
+        uv_set_idx : int
 
     def __init__(self, material):
         self._texture_defs = dict()
+        id_dict = dict()
 
-        def _define(parent, name: str, texel_dtype_name = None):
+        def _define(
+            parent,
+            name: str,
+            id : str,
+            texel_dtype_name = None
+        ):
             gltf_texture = getattr(parent, name + 'Texture')
             if gltf_texture is not None:
+                uv_set_idx = gltf_texture.texCoord
+                if uv_set_idx is None:
+                    uv_set_idx = 0
+
                 self._texture_defs[name] = self._TextureDef(
-                    gltf_texture, texel_dtype_name
+                    texel_dtype_name, uv_set_idx
                 )
 
-        _define(material, 'normal', 'Vector4f')
-        _define(material, 'occlusion')
-        _define(material, 'emissive', 'RgbaF')
+                if id in id_dict:
+                    raise RuntimeError(f'Material texture IDs must be unique')
+                id_dict[id] = uv_set_idx
+
+        _define(material, 'normal', 'n', 'Vector4f')
+        _define(material, 'occlusion', 'o')
+        _define(material, 'emissive', 'e', 'RgbaF')
 
         if material.pbrMetallicRoughness is not None:
             _define(
-                material.pbrMetallicRoughness, 'baseColor', 'RgbaF'
+                material.pbrMetallicRoughness, 'baseColor', 'bc', 'RgbaF'
             )
             _define(
                 material.pbrMetallicRoughness,
                 'metallicRoughness',
+                'mr',
                 'RgbaF'
             )
         elif material.extensions is not None:
@@ -51,6 +66,14 @@ class MaterialTextures:
                     ('KHR_materials_pbrSpecularGlossiness '
                      'is not implemented yet, '
                     'see https://github.com/metashade/metashade/issues/18')
+            
+        self._id = '_'.join([
+            f'{id}{uv_set_idx}' for id, uv_set_idx
+            in sorted(id_dict.items())
+        ])
+
+    def get_id(self) -> str:
+        return self._id
 
     def __len__(self):
         return len(self._texture_defs)
@@ -58,12 +81,12 @@ class MaterialTextures:
     def generate_uniforms(self, sh):
         # The host app allocates texture and uniform registers for material
         # textures sorted by name
-        for texture_idx, (texture_name, material_texture) in enumerate(
+        for texture_idx, (texture_name, texture_def) in enumerate(
             sorted(self._texture_defs.items())
         ):
             texel_dtype = (
-                getattr(sh, material_texture.texel_dtype_name)
-                if material_texture.texel_dtype_name is not None
+                getattr(sh, texture_def.texel_dtype_name)
+                if texture_def.texel_dtype_name is not None
                 else None
             )
             
@@ -79,15 +102,11 @@ class MaterialTextures:
             )
 
     def get_uv(self, sh, texture_name : str):
-        material_texture = self._texture_defs.get(texture_name)
-        if material_texture is None:
+        texture_def = self._texture_defs.get(texture_name)
+        if texture_def is None:
             return None
 
-        uv_set_idx = material_texture.gltf_texture.texCoord
-        if uv_set_idx is None:
-            uv_set_idx = 0
-
-        return getattr(sh.psIn, f'uv{uv_set_idx}')
+        return getattr(sh.psIn, f'uv{texture_def.uv_set_idx}')
 
     def sample_texture(self, sh, texture_name : str):
         # Get the UV member of the input structure

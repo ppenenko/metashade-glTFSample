@@ -14,6 +14,8 @@
 
 entry_point_name = 'main'
 
+filename_prefix = 'GltfPbr'
+
 def get_texture_uniform_name(name: str) -> str:
     return 'g_t' + name[0].upper() + name[1:]
     

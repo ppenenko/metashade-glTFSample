@@ -52,7 +52,8 @@ class Shader(_shader_base.Shader):
 class VertexShader(Shader):
     def __init__(self, out_dir, vertex_data):
         self._vertex_data = vertex_data
-        shader_name = 'GltfPbr'
+        
+        shader_name = common.filename_prefix
         vd_id = vertex_data.get_id()
         if vd_id != '':
             shader_name += f'-{vd_id}'
@@ -70,14 +71,15 @@ class VertexShader(Shader):
         self._generate_wrapped(generate)
 
 class PixelShader(Shader):
-    def __init__(self, out_dir, primitive_id, material, vertex_data):
+    def __init__(self, out_dir, material, vertex_data):
         self._ps_impl = impl_ps.ps(
             material = material,
             vertex_data = vertex_data
         )
-        
-        shader_name = f'{primitive_id}-PS'
-        super().__init__(out_dir, shader_name)
+        super().__init__(
+            out_dir = out_dir,
+            shader_name = self._ps_impl.get_id()
+        )
 
     def _generate(self):
         def generate(shader_file):

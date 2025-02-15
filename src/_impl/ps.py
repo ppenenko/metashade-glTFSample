@@ -33,6 +33,28 @@ class ps:
         self._alpha_mode = material.alphaMode
         self._alpha_cutoff = material.alphaCutoff
 
+    def get_id(self) -> str:
+        shader_name = common.filename_prefix
+
+        def get_alpha_mode_id():
+            if self._alpha_mode == 'BLEND':
+                return self._alpha_mode
+            elif self._alpha_mode == 'MASK':
+                return f'{self._alpha_mode}{self._alpha_cutoff}'
+            else:
+                return ''
+
+        for id in (
+            self._vertex_data.get_id(),
+            self._material_textures.get_id(),
+            get_alpha_mode_id()
+        ):
+            if id != '':
+                shader_name += f'-{id}'
+        
+        shader_name += '-PS'
+        return shader_name
+
     def generate(self, ps_file):
         sh = ps_6_0.Generator(
             ps_file,
