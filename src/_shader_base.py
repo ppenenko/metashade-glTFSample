@@ -26,18 +26,23 @@ class Shader(abc.ABC):
         out_dir : Path,
         shader_name : str
     ):
-        self.src_path = self._generate_src_path(out_dir, shader_name)
-        self.bin_path = self._generate_bin_path(out_dir, shader_name)
+        self._src_path = out_dir / f'{shader_name}.{self._get_src_extension()}'
+        self._bin_path = out_dir / f'{shader_name}.{self._get_bin_extension()}'
 
-    def get_id(self) -> str:
-        return self.bin_path.name
+    def get_index_name(self) -> str:
+        '''
+        Tha name for the shader index
+        '''
+        return self._bin_path.name
 
+    @staticmethod
     @abc.abstractmethod
-    def _generate_src_path(self, out_dir : Path, shader_name : str) -> Path:
+    def _get_src_extension() -> str:
         pass
 
+    @staticmethod
     @abc.abstractmethod
-    def _generate_bin_path(self, out_dir : Path, shader_name : str) -> Path:
+    def _get_bin_extension() -> str:
         pass
 
     @abc.abstractmethod
@@ -45,8 +50,8 @@ class Shader(abc.ABC):
         pass
 
     def _generate_wrapped(self, generate_func):
-        with perf.TimedScope(f'Generating {self.src_path} ', 'Done'), \
-            open(self.src_path, 'w') as shader_file:
+        with perf.TimedScope(f'Generating {self._src_path} ', 'Done'), \
+            open(self._src_path, 'w') as shader_file:
             #
             generate_func(shader_file)
 
@@ -67,7 +72,7 @@ class Shader(abc.ABC):
         self._generate()
 
         if ref_differ is not None:
-            ref_differ(self.src_path)
+            ref_differ(self._src_path)
 
         success = self._compile()
 

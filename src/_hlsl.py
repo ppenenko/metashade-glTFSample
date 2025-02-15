@@ -28,21 +28,23 @@ class Shader(_shader_base.Shader):
     def _get_hlsl_profile() -> str:
         pass
 
-    def _generate_src_path(self, out_dir : Path, shader_name : str) -> Path:
-        return out_dir / f'{shader_name}.hlsl'
+    @staticmethod
+    def _get_src_extension() -> str:
+        return 'hlsl'
 
-    def _generate_bin_path(self, out_dir : Path, shader_name : str) -> Path:
-        return out_dir / f'{shader_name}.cso'
+    @staticmethod
+    def _get_bin_extension() -> str:
+        return 'cso'
 
     def _compile(self) -> bool:
         try:
             dxc.compile(
-                src_path = self.src_path,
+                src_path = self._src_path,
                 entry_point_name = common.entry_point_name,
                 profile = self._get_hlsl_profile(),
                 to_spirv = False,
                 o0 = False,
-                output_path = self.bin_path
+                output_path = self._bin_path
             )
             return True
         except subprocess.CalledProcessError as err:

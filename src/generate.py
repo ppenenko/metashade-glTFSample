@@ -70,15 +70,15 @@ def _process_asset(
             )
 
             per_primitive_shader_index['dx'] = {
-                'vs': dx_vs.get_id(),
-                'ps': dx_ps.get_id(),
+                'vs': dx_vs.get_index_name(),
+                'ps': dx_ps.get_index_name(),
             }
 
             vk_frag = _glsl.FragmentShader(out_dir)
-            per_primitive_shader_index['vk'] = { 'frag' : vk_frag.get_id() }
+            per_primitive_shader_index['vk'] = { 'frag' : vk_frag.get_index_name() }
 
             for shader in (dx_vs, dx_ps, vk_frag):
-                shader_dict[shader.get_id()] = shader
+                shader_dict[shader.get_index_name()] = shader
 
             per_mesh_shader_index.append(per_primitive_shader_index)
 

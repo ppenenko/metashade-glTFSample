@@ -21,19 +21,21 @@ import _shader_base
 import _impl.ps as impl_ps
 
 class Shader(_shader_base.Shader, abc.ABC):
-    def _generate_src_path(self, out_dir : Path, shader_name : str) -> Path:
-        return out_dir / f'{shader_name}.glsl'
+    @staticmethod
+    def _get_src_extension() -> str:
+        return 'glsl'
 
-    def _generate_bin_path(self, out_dir : Path, shader_name : str) -> Path:
-        return out_dir / f'{shader_name}.spv'
-
+    @staticmethod
+    def _get_bin_extension() -> str:
+        return 'spv'
+    
     def _compile(self) -> bool:
         try:
             glslang.compile(
-                src_path = self.src_path,
+                src_path = self._src_path,
                 target_env = 'vulkan1.1',
                 shader_stage = self._get_stage_name(),
-                output_path = self.bin_path
+                output_path = self._bin_path
             )
             return True
         except subprocess.CalledProcessError as err:
