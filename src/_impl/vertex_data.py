@@ -49,7 +49,7 @@ class VertexData:
                 self._optional_attributes.add(attr.sl_name)
     
     def get_id(self) -> str:
-        return '_'.join(self._optional_attributes)
+        return '_'.join(sorted(self._optional_attributes))
 
     def _generate_vs_in(self, sh):
         with sh.vs_input('VsIn') as VsIn:

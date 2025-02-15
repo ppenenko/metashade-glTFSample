@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse, functools, io, json, os, sys
+import argparse, functools, io, json, os, shutil, sys
 from pathlib import Path
 import multiprocessing as mp
 from typing import List, NamedTuple
@@ -121,7 +121,10 @@ def generate(
     if not gltf_dir_path.is_dir():
         raise NotADirectoryError(gltf_dir_path)
 
-    os.makedirs(out_dir_path, exist_ok = True)
+    # Delete the output directory in order to delete any stale files
+    if os.path.exists(out_dir_path):
+        shutil.rmtree(out_dir_path)
+    os.makedirs(out_dir_path)
 
     shader_dict = dict()
 
