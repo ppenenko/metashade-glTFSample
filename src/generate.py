@@ -104,7 +104,6 @@ def _process_asset(
 def generate(
     gltf_dir_path : Path,
     out_dir_path : Path,
-    compile : bool,
     serial : bool,
     ref_differ : RefDiffer
 ):
@@ -118,27 +117,34 @@ def generate(
 
     shader_dict = dict()
 
-    process_asset_partial = functools.partial(
-        _process_asset,
-        out_dir = out_dir_path
-    )
-    gltf_files_glob = gltf_dir_path.glob('**/*.gltf')
+    with perf.TimedScope(
+        start_message = 'Parsing glTF assets',
+        end_message = 'Parsed all glTF assets'
+    ):
+        process_asset_partial = functools.partial(
+            _process_asset,
+            out_dir = out_dir_path
+        )
+        gltf_files_glob = gltf_dir_path.glob('**/*.gltf')
 
-    if serial:
-        for gltf_path in gltf_files_glob:
-            asset_result = process_asset_partial(gltf_file_path = gltf_path)
-            print(asset_result.log)
-            shader_dict |= asset_result.shader_dict
-    else:
-        with mp.Pool() as pool:
-            for asset_result in pool.imap_unordered(
-                process_asset_partial,
-                gltf_files_glob
-            ):
+        if serial:
+            for gltf_path in gltf_files_glob:
+                asset_result = process_asset_partial(gltf_file_path = gltf_path)
                 print(asset_result.log)
                 shader_dict |= asset_result.shader_dict
+        else:
+            with mp.Pool() as pool:
+                for asset_result in pool.imap_unordered(
+                    process_asset_partial,
+                    gltf_files_glob
+                ):
+                    print(asset_result.log)
+                    shader_dict |= asset_result.shader_dict
 
-    if compile:
+    with perf.TimedScope(
+        start_message = 'Generating and compiling shaders',
+        end_message = 'Done generating and compiling shaders'
+    ):
         print()
         dxc.identify()
         glslang.identify()
@@ -181,11 +187,6 @@ if __name__ == "__main__":
     parser.add_argument("--ref-dir", help = "Path to the test references")
     
     parser.add_argument(
-        "--compile",
-        action = 'store_true',
-        help = "Compile the generated shaders with DXC (has to be in PATH)"
-    )
-    parser.add_argument(
         "--serial",
         action = 'store_true',
         help = "Disable parallelization to facilitate debugging."
@@ -195,7 +196,6 @@ if __name__ == "__main__":
     generate(
         gltf_dir_path = Path(args.gltf_dir),
         out_dir_path = Path(args.out_dir),
-        compile = args.compile,
         serial = args.serial,
         ref_differ = RefDiffer(Path(args.ref_dir)) if args.ref_dir else None
     )

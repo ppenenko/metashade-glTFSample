@@ -54,7 +54,6 @@ class TestGenerate:
         generate.generate(
             gltf_dir_path = gltf_dir_path,
             out_dir_path = self._out_dir,
-            compile = True,
-            serial = False,
+            serial = True,
             ref_differ = self._ref_differ
         )
