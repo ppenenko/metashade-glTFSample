@@ -19,7 +19,6 @@ import _shader_base
 
 import _impl.ps as impl_ps
 import _impl.common as common
-from _impl.material_textures import MaterialTextures
 
 from metashade.hlsl.util import dxc
 
@@ -66,9 +65,9 @@ class VertexShader(Shader):
         return 'vs_6_0'
     
     def _generate(self):
-        def generate(shader_file):
-            self._vertex_data.generate_vs(shader_file)
-        self._generate_wrapped(generate)
+        self._generate_wrapped(
+            self._vertex_data.generate_vs
+        )
 
 class PixelShader(Shader):
     def __init__(self, out_dir, material, vertex_data):
@@ -82,9 +81,9 @@ class PixelShader(Shader):
         )
 
     def _generate(self):
-        def generate(shader_file):
-            self._ps_impl.generate(shader_file)
-        self._generate_wrapped(generate) 
+        self._generate_wrapped(
+            self._ps_impl.generate
+        ) 
 
     @staticmethod
     def _get_hlsl_profile():

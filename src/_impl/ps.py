@@ -18,7 +18,7 @@ from metashade.hlsl.sm6 import ps_6_0
 from metashade.glsl import frag
 
 from . import common, _pbr_surf_lib, _uniforms
-from .material_textures import MaterialTextures
+from ._material_textures import MaterialTextures
 from .vertex_data import VertexData
 
 class ps:

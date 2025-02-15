@@ -35,8 +35,8 @@ class TestGenerate:
         if out_dir is None:
             # Don't compare against references explicitly in the script.
             # Instead, overwrite the references with the generated files.
-            # This is useful for diffing or updating the references manually with
-            # git.
+            # This is useful for diffing or updating the references manually
+            # with git.
             cls._out_dir = ref_dir
             cls._ref_differ = None
         else:
