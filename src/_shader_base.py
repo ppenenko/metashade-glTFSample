@@ -46,35 +46,39 @@ class Shader(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _generate(self):
+    def _generate(self, ref_differ : RefDiffer):
         pass
 
-    def _generate_wrapped(self, generate_func):
-        with perf.TimedScope(f'Generating {self._src_path} ', 'Done'), \
+    def _generate_wrapped(
+        self,
+        generate_func,
+        ref_differ : RefDiffer
+    ):
+        with perf.TimedScope(f'Generating {self._src_path} '), \
             open(self._src_path, 'w') as shader_file:
             #
             generate_func(shader_file)
+
+        if ref_differ is not None:
+            ref_differ(self._src_path)
 
     class GenerateAndCompileResult(NamedTuple):
         log : str
         success : bool
 
     @abc.abstractmethod
-    def _compile(self) -> bool:
+    def _compile(self, ref_differ : RefDiffer) -> bool:
         pass
 
     def generate_and_compile(
-        self, ref_differ : RefDiffer
+        self,
+        ref_differ : RefDiffer
     ) -> GenerateAndCompileResult:
         log = io.StringIO()
         log, sys.stdout = sys.stdout, log
 
-        self._generate()
-
-        if ref_differ is not None:
-            ref_differ(self._src_path)
-
-        success = self._compile()
+        self._generate(ref_differ)
+        success = self._compile(ref_differ)
 
         log, sys.stdout = sys.stdout, log
         return Shader.GenerateAndCompileResult(log.getvalue(), success)

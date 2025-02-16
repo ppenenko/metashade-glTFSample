@@ -51,6 +51,13 @@ jobs:
         tag: main-tot
         fileName: glslang-master-windows-Release.zip
         out-file-path: '.glslang'
+    - uses: robinraju/release-downloader@v1.10
+      with:
+        repository: KhronosGroup/SPIRV-Cross
+        extract: true
+        tag: 2021-01-15
+        fileName: spirv-cross-vs2017-64bit-9acb9ec31f.tar.gz
+        out-file-path: '.SPIRV-Cross'
     - name: Print the directory tree
       run: |
         pwd
@@ -59,6 +66,7 @@ jobs:
       run: |
         Add-Content $env:GITHUB_PATH $env:GITHUB_WORKSPACE\.dxc\bin\x64
         Add-Content $env:GITHUB_PATH $env:GITHUB_WORKSPACE\.glslang\bin
+        Add-Content $env:GITHUB_PATH $env:GITHUB_WORKSPACE\.SPIRV-Cross\bin
         Add-Content $env:GITHUB_ENV METASHADE_GLTFSAMPLE_PYTEST_OUT_DIR=$env:GITHUB_WORKSPACE/tests/out
     - name: Test with pytest
       run: |

@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import abc
+import abc, os, subprocess
 from pathlib import Path
-import subprocess
+
 import _shader_base
 
 import _impl.ps as impl_ps
 import _impl.common as common
 
 from metashade.hlsl.util import dxc
+from metashade.glsl.util import glslang
+from metashade.util.tests import RefDiffer
+from metashade.util import spirv_cross
 
 class Shader(_shader_base.Shader):
     @staticmethod
@@ -35,17 +38,54 @@ class Shader(_shader_base.Shader):
     @staticmethod
     def _get_bin_extension() -> str:
         return 'cso'
+    
+    @staticmethod
+    @abc.abstractmethod
+    def _get_glslang_stage() -> str:
+        pass
 
-    def _compile(self) -> bool:
+    def _compile(self, ref_differ : RefDiffer) -> bool:
         try:
-            dxc.compile(
-                src_path = self._src_path,
-                entry_point_name = common.entry_point_name,
-                profile = self._get_hlsl_profile(),
+            def dxc_compile(to_spirv, output_path):
+                dxc.compile(
+                    src_path = self._src_path,
+                    entry_point_name = common.entry_point_name,
+                    profile = self._get_hlsl_profile(),
+                    to_spirv = to_spirv,
+                    o0 = to_spirv,
+                    output_path = output_path
+                )
+
+            # Compile to DXIL for consumption by the DX12 host app
+            dxc_compile(
                 to_spirv = False,
-                o0 = False,
                 output_path = self._bin_path
             )
+
+            # Transpile to GLSL for reference while bringing up the GLSL
+            # backend
+            spirv_path = self._src_path.parent / (self._src_path.name + '.spv')
+            dxc_compile(
+                to_spirv = True,
+                output_path = spirv_path
+            )
+
+            glsl_path = self._src_path.parent / (self._src_path.name + '.glsl')
+            spirv_cross.spirv_to_glsl(
+                spirv_path = spirv_path,
+                glsl_path = glsl_path
+            )
+
+            if ref_differ is not None:
+                ref_differ(glsl_path)
+
+            glslang.compile(
+                src_path = glsl_path,
+                target_env = 'vulkan1.1',
+                shader_stage = self._get_glslang_stage(),
+                output_path = os.devnull
+            )
+            
             return True
         except subprocess.CalledProcessError as err:
             return False
@@ -66,9 +106,14 @@ class VertexShader(Shader):
     def _get_hlsl_profile() -> str:
         return 'vs_6_0'
     
-    def _generate(self):
+    @staticmethod
+    def _get_glslang_stage() -> str:
+        return 'vert'
+    
+    def _generate(self, ref_differ):
         self._generate_wrapped(
-            self._vertex_data.generate_vs
+            self._vertex_data.generate_vs,
+            ref_differ
         )
 
 class PixelShader(Shader):
@@ -82,11 +127,16 @@ class PixelShader(Shader):
             shader_name = self._ps_impl.get_id()
         )
 
-    def _generate(self):
-        self._generate_wrapped(
-            self._ps_impl.generate
-        ) 
-
     @staticmethod
     def _get_hlsl_profile():
         return 'ps_6_0'
+
+    @staticmethod
+    def _get_glslang_stage() -> str:
+        return 'frag'
+
+    def _generate(self, ref_differ):
+        self._generate_wrapped(
+            self._ps_impl.generate,
+            ref_differ
+        )

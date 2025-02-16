@@ -29,7 +29,7 @@ class Shader(_shader_base.Shader, abc.ABC):
     def _get_bin_extension() -> str:
         return 'spv'
     
-    def _compile(self) -> bool:
+    def _compile(self, ref_differ) -> bool:
         try:
             glslang.compile(
                 src_path = self._src_path,
@@ -45,8 +45,8 @@ class FragmentShader(Shader):
     def __init__(self, out_dir):
         super().__init__(out_dir, 'GLTFPbrPass-frag')
 
-    def _generate(self):
-        self._generate_wrapped(impl_ps.generate_frag)
+    def _generate(self, ref_differ):
+        self._generate_wrapped(impl_ps.generate_frag, ref_differ)
 
     @staticmethod
     def _get_stage_name() -> str:
