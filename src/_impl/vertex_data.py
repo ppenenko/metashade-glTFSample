@@ -52,6 +52,10 @@ class VertexData:
         return '_'.join(sorted(self._optional_attributes))
 
     def _generate_vs_in(self, sh):
+        # TODO: for Vulkan, the attribute's locations follow the order of the attributes in the glTF asset:
+        # https://github.com/metashade/Cauldron/blob/metashade_demo/src/VK/GLTF/GltfPbrPass.cpp#L204
+        # https://github.com/metashade/Cauldron/blob/metashade_demo/src/VK/GLTF/GLTFTexturesAndBuffers.cpp#L207
+        #
         with sh.vs_input('VsIn') as VsIn:
             VsIn.position('Pobj', sh.Point3f)
             VsIn.normal('Nobj', sh.Vector3f)
@@ -63,6 +67,9 @@ class VertexData:
                     )
 
     def generate_vs_out(self, sh):
+        # TODO: for Vulkan, we should generate a regular struct with an
+        # instance at layout 0
+        #
         with sh.vs_output('VsOut') as VsOut:
             VsOut.SV_Position('Pclip', sh.Vector4f)
             
