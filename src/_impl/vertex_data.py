@@ -68,7 +68,8 @@ class VertexData:
 
     def generate_vs_out(self, sh):
         # TODO: for Vulkan, we should generate a regular struct with an
-        # instance at layout 0
+        # instance at location 0
+        # https://github.com/metashade/Cauldron/blob/metashade_demo/src/VK/shaders/GLTF_VS2PS_IO.glsl
         #
         with sh.vs_output('VsOut') as VsOut:
             VsOut.SV_Position('Pclip', sh.Vector4f)
