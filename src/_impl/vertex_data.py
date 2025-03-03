@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import OrderedDict
 from typing import NamedTuple
 
 from metashade.hlsl.sm6 import vs_6_0
@@ -24,7 +25,7 @@ class VertexData:
         hlsl_semantic : str
         dtype : str
 
-    _optional_attribute_defs = (
+    _optional_vs_in_attr_defs = (
         _AttributeDef('TANGENT',     'Tobj',         'tangent',  'Vector4f'),
         _AttributeDef('TEXCOORD_0',  'uv0',          'texCoord', 'Point2f'),
         _AttributeDef('TEXCOORD_1',  'uv1',          'texCoord', 'Point2f'),
@@ -32,27 +33,27 @@ class VertexData:
     )
 
     def __init__(self, primitive):
-        attributes = primitive.attributes
+        gltf_attrs = primitive.attributes
 
         for mandatory_attr in ('POSITION', 'NORMAL'):
-            if getattr(attributes, mandatory_attr) is None:
+            if getattr(gltf_attrs, mandatory_attr) is None:
                 raise RuntimeError(f"Mandatory attribute '{mandatory_attr}' is missing")
 
         for unsupported_attr in ('JOINTS_0', 'WEIGHTS_0'):
-            if getattr(attributes, unsupported_attr) is not None:
+            if getattr(gltf_attrs, unsupported_attr) is not None:
                 raise RuntimeError(f"Unsupported attribute '{unsupported_attr}'")
 
         self._optional_attributes = set()
 
-        for attr in self._optional_attribute_defs:
-            if getattr(attributes, attr.gltf_name) is not None:
+        for attr in self._optional_vs_in_attr_defs:
+            if getattr(gltf_attrs, attr.gltf_name) is not None:
                 self._optional_attributes.add(attr.sl_name)
     
     def get_id(self) -> str:
         return '_'.join(sorted(self._optional_attributes))
 
     def _generate_vs_in(self, sh):
-        # TODO: for Vulkan, the attribute's locations follow the order of the attributes in the glTF asset:
+        # TODO: for Vulkan, the attributes' locations follow the order of the attributes in the glTF asset:
         # https://github.com/metashade/Cauldron/blob/metashade_demo/src/VK/GLTF/GltfPbrPass.cpp#L204
         # https://github.com/metashade/Cauldron/blob/metashade_demo/src/VK/GLTF/GLTFTexturesAndBuffers.cpp#L207
         #
@@ -60,34 +61,52 @@ class VertexData:
             VsIn.position('Pobj', sh.Point3f)
             VsIn.normal('Nobj', sh.Vector3f)
 
-            for attr in self._optional_attribute_defs:
+            for attr in self._optional_vs_in_attr_defs:
                 if attr.sl_name in self._optional_attributes:
                     getattr(VsIn, attr.hlsl_semantic)(
                         attr.sl_name, getattr(sh, attr.dtype)
                     )
 
+    _vs_out_attrs = {
+        'Pclip' : 'Vector4f',
+        'Pw'    : 'Point3f',
+        'Nw'    : 'Vector3f',
+        'Tw'    : 'Vector3f',
+        'Bw'    : 'Vector3f'
+    }
+
     def generate_vs_out(self, sh):
-        # TODO: for Vulkan, we should generate a regular struct with an
-        # instance at location 0
-        # https://github.com/metashade/Cauldron/blob/metashade_demo/src/VK/shaders/GLTF_VS2PS_IO.glsl
-        #
         with sh.vs_output('VsOut') as VsOut:
-            VsOut.SV_Position('Pclip', sh.Vector4f)
-            
-            VsOut.texCoord('Pw', sh.Point3f)
-            VsOut.texCoord('Nw', sh.Vector3f)
+            def add_attr(semantic_name, attr_name):
+                dtype = self._vs_out_attrs[attr_name]
+                dtype = getattr(sh, dtype)
+                semantic_func = getattr(VsOut, semantic_name)
+                semantic_func(attr_name, dtype)
+
+            add_attr('SV_Position', 'Pclip')
+
+            add_attr('texCoord', 'Pw')
+            add_attr('texCoord', 'Nw')
 
             if 'Tobj' in self._optional_attributes:
-                VsOut.texCoord('Tw', sh.Vector3f)
-                VsOut.texCoord('Bw', sh.Vector3f)
+                add_attr('texCoord', 'Tw')
+                add_attr('texCoord', 'Bw')
 
-            for attr in self._optional_attribute_defs:
-                if ( attr.sl_name != 'Tobj'
-                    and attr.sl_name in self._optional_attributes
+            for vs_in_attr in self._optional_vs_in_attr_defs:
+                if ( vs_in_attr.sl_name != 'Tobj'
+                    and vs_in_attr.sl_name in self._optional_attributes
                 ):
-                    getattr(VsOut, attr.hlsl_semantic)(
-                        attr.sl_name, getattr(sh, attr.dtype)
-                    )
+                    dtype = getattr(sh, vs_in_attr.dtype)
+                    semantic_func = getattr(VsOut, vs_in_attr.hlsl_semantic)
+                    semantic_func( vs_in_attr.sl_name, dtype )
+
+    def generate_legacy_vs_out(self, sh):
+        # TODO: for compatibility with the original Vulkan demo, we should
+        # generate a regular struct with an instance at location 0
+        # https://github.com/metashade/Cauldron/blob/metashade_demo/src/VK/shaders/GLTF_VS2PS_IO.glsl
+        #
+        
+        struct_members = OrderedDict()
 
     def generate_vs(self, vs_file):
         sh = vs_6_0.Generator(
@@ -113,7 +132,7 @@ class VertexData:
                 sh.vsOut.Bw = sh.vsOut.Nw.cross(sh.vsOut.Tw) * sh.vsIn.Tobj.w
 
             # Simple passthrough for these attributes
-            for attr in self._optional_attribute_defs:
+            for attr in self._optional_vs_in_attr_defs:
                 if ( attr.sl_name != 'Tobj'
                     and attr.sl_name in self._optional_attributes
                 ):
