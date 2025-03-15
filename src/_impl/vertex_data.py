@@ -19,18 +19,10 @@ from metashade.hlsl.sm6 import vs_6_0
 from . import common, _uniforms
 
 class VertexData:
-    class _AttributeDef(NamedTuple):
+    class _PassthruAttrDef(NamedTuple):
         gltf_name : str
-        sl_name : str
         hlsl_semantic : str
         dtype : str
-
-    _optional_vs_in_attr_defs = (
-        _AttributeDef('TANGENT',     'Tobj',         'tangent',  'Vector4f'),
-        _AttributeDef('TEXCOORD_0',  'uv0',          'texCoord', 'Point2f'),
-        _AttributeDef('TEXCOORD_1',  'uv1',          'texCoord', 'Point2f'),
-        _AttributeDef('COLOR_0',     'rgbaColor0',   'color',    'RgbaF')
-    )
 
     def __init__(self, primitive):
         gltf_attrs = primitive.attributes
@@ -43,14 +35,28 @@ class VertexData:
             if getattr(gltf_attrs, unsupported_attr) is not None:
                 raise RuntimeError(f"Unsupported attribute '{unsupported_attr}'")
 
-        self._optional_attributes = set()
+        self._has_tangent = gltf_attrs.TANGENT is not None
 
-        for attr in self._optional_vs_in_attr_defs:
-            if getattr(gltf_attrs, attr.gltf_name) is not None:
-                self._optional_attributes.add(attr.sl_name)
+        self._passthru_attrs = OrderedDict()
+        for sl_name, attr_def in (
+            ('uv0', self._PassthruAttrDef(
+                'TEXCOORD_0',   'texCoord', 'Point2f'
+            )),
+            ('uv1', self._PassthruAttrDef(
+                'TEXCOORD_1',   'texCoord', 'Point2f'
+            )),
+            ('rgbaColor0', self._PassthruAttrDef(
+                'COLOR_0',     'color',     'RgbaF'
+            ))
+        ):
+            if getattr(gltf_attrs, attr_def.gltf_name) is not None:
+                self._passthru_attrs[sl_name] = attr_def
     
     def get_id(self) -> str:
-        return '_'.join(sorted(self._optional_attributes))
+        optional_attrs = list(self._passthru_attrs.keys())
+        if self._has_tangent:
+            optional_attrs.append('Tobj')
+        return '_'.join(sorted(optional_attrs))
 
     def _generate_vs_in(self, sh):
         # TODO: for Vulkan, the attributes' locations follow the order of the attributes in the glTF asset:
@@ -61,13 +67,16 @@ class VertexData:
             VsIn.position('Pobj', sh.Point3f)
             VsIn.normal('Nobj', sh.Vector3f)
 
-            for attr in self._optional_vs_in_attr_defs:
-                if attr.sl_name in self._optional_attributes:
-                    getattr(VsIn, attr.hlsl_semantic)(
-                        attr.sl_name, getattr(sh, attr.dtype)
-                    )
+            if self._has_tangent:
+                VsIn.tangent('Tobj', sh.Vector4f)
 
-    _vs_out_attrs = {
+            for sl_name, attr_def in self._passthru_attrs.items():
+                semantic_func = getattr(VsIn, attr_def.hlsl_semantic)
+                semantic_func(
+                    sl_name, getattr(sh, attr_def.dtype)
+                )
+
+    _vs_out_attr_dtypes = {
         'Pclip' : 'Vector4f',
         'Pw'    : 'Point3f',
         'Nw'    : 'Vector3f',
@@ -78,7 +87,7 @@ class VertexData:
     def generate_vs_out(self, sh):
         with sh.vs_output('VsOut') as VsOut:
             def add_attr(semantic_name, attr_name):
-                dtype = self._vs_out_attrs[attr_name]
+                dtype = self._vs_out_attr_dtypes[attr_name]
                 dtype = getattr(sh, dtype)
                 semantic_func = getattr(VsOut, semantic_name)
                 semantic_func(attr_name, dtype)
@@ -88,17 +97,14 @@ class VertexData:
             add_attr('texCoord', 'Pw')
             add_attr('texCoord', 'Nw')
 
-            if 'Tobj' in self._optional_attributes:
+            if self._has_tangent:
                 add_attr('texCoord', 'Tw')
                 add_attr('texCoord', 'Bw')
 
-            for vs_in_attr in self._optional_vs_in_attr_defs:
-                if ( vs_in_attr.sl_name != 'Tobj'
-                    and vs_in_attr.sl_name in self._optional_attributes
-                ):
-                    dtype = getattr(sh, vs_in_attr.dtype)
-                    semantic_func = getattr(VsOut, vs_in_attr.hlsl_semantic)
-                    semantic_func( vs_in_attr.sl_name, dtype )
+            for sl_name, attr_def in self._passthru_attrs.items():
+                dtype = getattr(sh, attr_def.dtype)
+                semantic_func = getattr(VsOut, attr_def.hlsl_semantic)
+                semantic_func( sl_name, dtype )
 
     def generate_legacy_vs_out(self, sh):
         # TODO: for compatibility with the original Vulkan demo, we should
@@ -127,15 +133,12 @@ class VertexData:
             sh.vsOut.Pw = sh.Pw.xyz
             sh.vsOut.Nw = sh.g_WorldXf.xform(sh.vsIn.Nobj).xyz.normalize()
             
-            if hasattr(sh.vsIn, 'Tobj'):
+            if self._has_tangent:
                 sh.vsOut.Tw = sh.g_WorldXf.xform(sh.vsIn.Tobj.xyz).xyz.normalize()
                 sh.vsOut.Bw = sh.vsOut.Nw.cross(sh.vsOut.Tw) * sh.vsIn.Tobj.w
 
             # Simple passthrough for these attributes
-            for attr in self._optional_vs_in_attr_defs:
-                if ( attr.sl_name != 'Tobj'
-                    and attr.sl_name in self._optional_attributes
-                ):
-                    setattr(sh.vsOut, attr.sl_name, getattr(sh.vsIn, attr.sl_name))
+            for sl_name in self._passthru_attrs.keys():
+                setattr(sh.vsOut, sl_name, getattr(sh.vsIn, sl_name))
 
             sh.return_(sh.vsOut)
