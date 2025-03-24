@@ -17,7 +17,89 @@ TODO: generate once and include in all pixel shaders.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
+import math, sys
+from metashade.modules import export
+
+@export
+def D_Ggx(sh, NdotH : 'Float', fAlphaRoughness : 'Float') -> 'Float':
+    sh // "https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)"
+    sh // ""
+    sh.fASqr = fAlphaRoughness * fAlphaRoughness
+    sh.fF = (NdotH * sh.fASqr - NdotH) * NdotH + sh.Float(1.0)
+    sh.return_(
+        (sh.fASqr / (sh.Float(math.pi) * sh.fF * sh.fF )).saturate()
+    )
+
+@export
+def F_Schlick(sh, LdotH : 'Float', rgbF0 : 'RgbF') -> 'RgbF':
+    sh.return_(
+        rgbF0 + (sh.RgbF(1.0) - rgbF0)
+            * (sh.Float(1.0) - LdotH).pow(sh.Float(5.0))
+    )
+
+@export
+def V_SmithGgxCorrelated(
+    sh,
+    NdotV : 'Float',
+    NdotL : 'Float',
+    fAlphaRoughness : 'Float'
+) -> 'Float':
+    sh // "https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)"
+    sh // ""
+    sh.fASqr = fAlphaRoughness * fAlphaRoughness
+    sh.fGgxL = NdotV * (
+        (NdotL - NdotL * sh.fASqr) * NdotL + sh.fASqr
+    ).sqrt()
+    sh.fGgxV = NdotL * (
+        (NdotV - NdotV * sh.fASqr) * NdotV + sh.fASqr
+    ).sqrt()
+    sh.fV = sh.Float(0.5) / (sh.fGgxL + sh.fGgxV)
+    sh.return_(sh.fV.saturate())
+
+@export
+def Fd_Lambert(sh) -> 'Float':
+    sh.return_( sh.Float( 1.0 / math.pi ) )
+
+@export
+def pbrBrdf(
+    sh, L : 'Vector3f', N : 'Vector3f', V : 'Vector3f', pbrParams : 'PbrParams'
+) -> 'RgbF':
+    sh.NdotV = (N @ V).abs()
+    sh.NdotL = (N @ L).saturate()
+
+    sh.H = (V + L).normalize()
+    sh.NdotH = (N @ sh.H).saturate()
+    sh.LdotH = (L @ sh.H).saturate()
+
+    sh.fAlphaRoughness = ( pbrParams.fPerceptualRoughness
+        * pbrParams.fPerceptualRoughness
+    )
+
+    sh.fD = sh.D_Ggx(
+        NdotH = sh.NdotH,
+        fAlphaRoughness = sh.fAlphaRoughness
+    )
+    sh.rgbF = sh.F_Schlick(
+        LdotH = sh.LdotH, rgbF0 = pbrParams.rgbF0
+    )
+    sh.fV = sh.V_SmithGgxCorrelated(
+        NdotV = sh.NdotV,
+        NdotL = sh.NdotL,
+        fAlphaRoughness = sh.fAlphaRoughness
+    )
+
+    sh.rgbFr = (sh.fD * sh.fV) * sh.rgbF
+    sh.rgbFd = pbrParams.rgbDiffuse * sh.Fd_Lambert()
+    
+    sh.return_(sh.NdotL * (sh.rgbFr + sh.rgbFd))
+
+@export
+def getRangeAttenuation(sh, light : 'Light', d : 'Float') -> 'Float':
+    # https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
+    # TODO: handle undefined/unlimited ranges
+    sh.return_(
+        (d / light.fRange).lerp(sh.Float(1), sh.Float(0)).saturate()
+    )
 
 def generate(sh):
     sh.struct('PbrParams')(
@@ -27,79 +109,5 @@ def generate(sh):
         fOpacity = sh.Float
     )
 
-    sh // "https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/normaldistributionfunction(speculard)"
-    sh // ""
-    with sh.function('D_Ggx', sh.Float)(
-        NdotH = sh.Float, fAlphaRoughness = sh.Float
-    ):
-        sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
-        sh.fF = (sh.NdotH * sh.fASqr - sh.NdotH) * sh.NdotH + sh.Float(1.0)
-        sh.return_(
-            (sh.fASqr / (sh.Float(math.pi) * sh.fF * sh.fF )).saturate()
-        )
-
-    with sh.function('F_Schlick', sh.RgbF)(LdotH = sh.Float, rgbF0 = sh.RgbF):
-        sh.return_(
-            sh.rgbF0 + (sh.RgbF(1.0) - sh.rgbF0)
-                * (sh.Float(1.0) - sh.LdotH).pow(sh.Float(5.0))
-        )
-
-    sh // "https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)"
-    sh // ""
-    with sh.function('V_SmithGgxCorrelated', sh.Float)(
-        NdotV = sh.Float, NdotL = sh.Float, fAlphaRoughness = sh.Float
-    ):
-        sh.fASqr = sh.fAlphaRoughness * sh.fAlphaRoughness
-        sh.fGgxL = sh.NdotV * (
-            (sh.NdotL - sh.NdotL * sh.fASqr) * sh.NdotL + sh.fASqr
-        ).sqrt()
-        sh.fGgxV = sh.NdotL * (
-            (sh.NdotV - sh.NdotV * sh.fASqr) * sh.NdotV + sh.fASqr
-        ).sqrt()
-        sh.fV = sh.Float(0.5) / (sh.fGgxL + sh.fGgxV)
-        sh.return_(sh.fV.saturate())
-
-    with sh.function('Fd_Lambert', sh.Float)():
-        sh.return_( sh.Float( 1.0 / math.pi ) )
-
-    with sh.function('pbrBrdf', sh.RgbF)(
-        L = sh.Vector3f, N = sh.Vector3f, V = sh.Vector3f,
-        pbrParams = sh.PbrParams
-    ):
-        sh.NdotV = (sh.N @ sh.V).abs()
-        sh.NdotL = (sh.N @ sh.L).saturate()
-
-        sh.H = (sh.V + sh.L).normalize()
-        sh.NdotH = (sh.N @ sh.H).saturate()
-        sh.LdotH = (sh.L @ sh.H).saturate()
-
-        sh.fAlphaRoughness = ( sh.pbrParams.fPerceptualRoughness
-            * sh.pbrParams.fPerceptualRoughness
-        )
-
-        sh.fD = sh.D_Ggx(
-            NdotH = sh.NdotH,
-            fAlphaRoughness = sh.fAlphaRoughness
-        )
-        sh.rgbF = sh.F_Schlick(
-            LdotH = sh.LdotH, rgbF0 = sh.pbrParams.rgbF0
-        )
-        sh.fV = sh.V_SmithGgxCorrelated(
-            NdotV = sh.NdotV,
-            NdotL = sh.NdotL,
-            fAlphaRoughness = sh.fAlphaRoughness
-        )
-
-        sh.rgbFr = (sh.fD * sh.fV) * sh.rgbF
-        sh.rgbFd = sh.pbrParams.rgbDiffuse * sh.Fd_Lambert()
-        
-        sh.return_(sh.NdotL * (sh.rgbFr + sh.rgbFd))
-
-    with sh.function('getRangeAttenuation', sh.Float)(
-        light = sh.Light, d = sh.Float
-    ):
-        # https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
-        # TODO: handle undefined/unlimited ranges
-        sh.return_(
-            (sh.d / sh.light.fRange).lerp(sh.Float(1), sh.Float(0)).saturate()
-        )
+    this_module = sys.modules[globals()['__name__']]
+    sh.instantiate(this_module)
