@@ -29,24 +29,20 @@ def _generate_per_frame_uniform_buffer(sh):
     )
 
     with sh.uniform_buffer(dx_register = 0, name = 'cbPerFrame'):
-        sh.uniform('g_VpXf', sh.Matrix4x4f)
-        sh.uniform('g_prevVpXf', sh.Matrix4x4f)
-        sh.uniform('g_VpIXf', sh.Matrix4x4f)
-        sh.uniform('g_cameraPw', sh.Point3f)
-        sh.uniform('g_cameraPw_fPadding', sh.Float)
-        sh.uniform('g_fIblFactor', sh.Float)
+        sh.uniform('g_VpXf',                    sh.Matrix4x4f)
+        sh.uniform('g_prevVpXf',                sh.Matrix4x4f)
+        sh.uniform('g_VpIXf',                   sh.Matrix4x4f)
+        sh.uniform('g_cameraPw',                sh.Point3f)
+        sh.uniform('g_cameraPw_fPadding',       sh.Float)
+        sh.uniform('g_fIblFactor',              sh.Float)
         sh.uniform('g_fPerFrameEmissiveFactor', sh.Float)
-        sh.uniform('g_fInvScreenResolution', sh.Float2)
-        sh.uniform('g_f4WireframeOptions', sh.Float4)
-        sh.uniform('g_f2MCameraCurrJitter', sh.Float2)
-        sh.uniform('g_f2MCameraPrevJitter', sh.Float2)
-
-        # should be an array
-        for light_idx in range(0, 80):
-            sh.uniform(f'g_light{light_idx}', sh.Light)
-
-        sh.uniform('g_nLights', sh.Int)
-        sh.uniform('g_lodBias', sh.Float)
+        sh.uniform('g_fInvScreenResolution',    sh.Float2)
+        sh.uniform('g_f4WireframeOptions',      sh.Float4)
+        sh.uniform('g_f2MCameraCurrJitter',     sh.Float2)
+        sh.uniform('g_f2MCameraPrevJitter',     sh.Float2)
+        sh.uniform('g_lights',                  sh.array(sh.Light, (80,)))
+        sh.uniform('g_nLights',                 sh.Int)
+        sh.uniform('g_lodBias',                 sh.Float)
 
 def _generate_per_object_uniform_buffer(sh, for_ps : bool):
     if for_ps:

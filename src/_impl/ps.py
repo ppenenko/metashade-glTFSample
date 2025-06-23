@@ -276,7 +276,7 @@ class ps:
             sh.psOut.rgbaColor.a = sh.pbrParams.fOpacity
 
             sh.psOut.rgbaColor.rgb = sh.applySpotLight(
-                light = sh.g_light0,
+                light = sh.g_lights[0],
                 Pw = sh.psIn.Pw,
                 Nw = sh.Nw,
                 Vw = sh.Vw,
