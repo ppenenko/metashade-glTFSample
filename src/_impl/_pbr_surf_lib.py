@@ -90,6 +90,10 @@ def pbrBrdf(
 
     sh.rgbFr = (sh.fD * sh.fV) * sh.rgbF
     sh.rgbFd = pbrParams.rgbDiffuse * sh.Fd_Lambert()
+
+    # For energy conservation, especially for dielectrics, scale diffuse contribution
+    # by what is not reflected specularly.
+    sh.rgbFd *= (sh.RgbF(1.0) - sh.rgbF)
     
     sh.return_(sh.NdotL * (sh.rgbFr + sh.rgbFd))
 
